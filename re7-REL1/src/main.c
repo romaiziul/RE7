@@ -55,8 +55,11 @@ int main(void)
     return 0;
 }
 
-/* Iniciar no temrinal:
-gcc src/main.c src/game.c src/ui.c src/scenes.c src/assets.c src/story.c src/minigame.c src/room.c src/audio_manager.c -o re7.exe -IC:/raylib/raylib/src -Isrc -LC:/raylib/raylib/src -lraylib -lopengl32 -lgdi32 -lwinmm
+/* Para compilar, na raiz do projeto (re7-REL1):
+
+.\build.ps1
+
+Para rodar (sempre da raiz do projeto):
 
 .\re7.exe
 
