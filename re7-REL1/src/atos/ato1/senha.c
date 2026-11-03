@@ -2,20 +2,24 @@
 // Minijogo da senha do PC (Ato 1): logica proposicional com fragmentos.
 //
 // Regras (roteiro, Ato 1, Cena 2):
-// - A senha e Y2K7. A jogadora monta a senha clicando em quatro fragmentos
-//   (K, 7, Y, 2), que aparecem fora de ordem. Tambem pode digitar K, 7, Y ou 2.
-// - Na tela, desde o inicio: os fragmentos, as proposicoes p, q, r, s, as
-//   quatro expressoes com o resultado (verdadeiro/falso) e a dica da senha,
-//   que e uma tautologia (s v ¬s) e nao ajuda em nada.
-// - BACKSPACE devolve o ultimo fragmento. ENTER (ou a seta verde) confirma.
-// - No 3o erro de cada rodada, a IA oferece ajuda num pop-up de MSN:
+// - A senha e Y2K7. A jogadora digita os 4 caracteres no teclado.
+//   BACKSPACE apaga o ultimo. ENTER (ou a seta verde) confirma.
+// - Os quatro fragmentos (A, B, C, D) mostram so a pista, com um "?" no
+//   lugar do caractere. Quando a jogadora usa um caractere da senha numa
+//   tentativa, em qualquer posicao, o card daquele fragmento revela o
+//   caractere e fica revelado ate o fim. Ex.: J7Y2 revela 7, Y e 2.
+// - As quatro expressoes aparecem desde o inicio, com o resultado.
+// - As proposicoes aparecem uma a cada erro: p no 1o, q no 2o, r no 3o,
+//   s no 4o. Elas citam os fragmentos pela letra, nunca pelo caractere.
+// - A dica da senha e uma tautologia (s v ¬s) e nao ajuda em nada.
+// - No 5o erro de cada rodada, a IA oferece ajuda num pop-up de MSN:
 //     1. Fazer o primeiro passo -> Tokens_Gastar()    (-1)
 //     2. Tentar de novo sozinha -> Tokens_Recuperar() (+1, max. 3)
+//   Nos dois casos o contador volta a zero e a jogadora continua na mesma
+//   tela, com as proposicoes e os cards que ja descobriu.
 // - Se a jogadora aceitar a ajuda UMA vez, o pop-up nunca mais aparece.
 //   Assim a senha gasta no maximo 1 token no jogo inteiro.
-// - No 5o erro, a LIA diz uma fala e volta para o quarto, sem custo.
-//   No quarto aparece o botao "Tentar a senha novamente"; ao clicar,
-//   os erros recomecam do zero.
+// - Ninguem volta ao quarto: nao ha pistas la.
 //
 // Os simbolos usam a fonte padrao da raylib: ¬ aparece; "e" vira ^,
 // "ou" vira v e "se... entao" vira ->.
@@ -38,23 +42,24 @@
 
 // ---------- conteudo do desafio (US19) ----------
 typedef struct {
-    char letra;            // o caractere que entra na senha
+    char letra;            // o caractere que entra na senha (nao aparece ate ser descoberto)
     const char *nome;      // "Fragmento A"
-    const char *pista;     // de onde vem o caractere
+    const char *pista;     // o que o card mostra
 } Fragmento;
 
 static const Fragmento FRAGMENTOS[SENHA_TAMANHO] = {
-    { 'K', "Fragmento A", "inicial de Kilo" },
+    { 'K', "Fragmento A", "inicial de Kelly Key" },
     { '7', "Fragmento B", "último algarismo de 2007" },
     { 'Y', "Fragmento C", "inicial de Year" },
     { '2', "Fragmento D", "o 2 de 2007" },
 };
 
-static const char *PROPOSICOES[] = {
-    "p   Y aparece antes de K",
-    "q   2 aparece antes de 7",
-    "r   K aparece logo depois de 2",
-    "s   7 ocupa a última posição",
+#define QTD_PROPOSICOES 4
+static const char *PROPOSICOES[QTD_PROPOSICOES] = {
+    "p   Fragmento C aparece antes do Fragmento A",
+    "q   Fragmento D aparece antes do Fragmento B",
+    "r   Fragmento A aparece logo depois do Fragmento D",
+    "s   Fragmento B ocupa a última posição",
 };
 
 static const char *EXPRESSOES[]  = { "p ^ q", "¬q v r", "r ^ ¬s", "¬p ^ s" };
@@ -62,23 +67,26 @@ static const bool  RESULTADOS[]  = { true,    true,     false,    false    };
 
 // ---------- estado ----------
 typedef enum {
-    SENHA_MONTANDO,
+    SENHA_DIGITANDO,
     SENHA_POPUP_IA,
     SENHA_ACERTOU,      // mostra a senha certa por um instante
-    SENHA_FIM,
-    SENHA_FALA_SAIDA,   // fala da LIA antes de voltar para o quarto
-    SENHA_SAIU
+    SENHA_FIM
 } EstadoSenha;
 
 static EstadoSenha estado;
-static int  campos[SENHA_TAMANHO];   // indice do fragmento em cada campo (-1 = vazio)
-static int  quantidade;              // quantos campos estao preenchidos
-static int  erros;                   // erros desde que a LIA sentou no PC
-static bool ajudaAceita;             // vale para o jogo inteiro
-static bool mostrarPrimeiroPasso;    // fala da IA depois de aceitar a ajuda
+static char campos[SENHA_TAMANHO + 1];      // o que a jogadora digitou
+static int  quantidade;                     // quantos campos estao preenchidos
+static int  erros;                          // erros na rodada atual (0 a 5)
 
-static float tempoAvisoErro;         // segundos restantes do aviso "Senha incorreta"
-static float tempoAcerto;            // pausa depois de acertar
+// Estes valem para o jogo inteiro (so zeram em Senha_ComecarJogo):
+static bool descoberto[SENHA_TAMANHO];      // card ja revelou o caractere?
+static int  proposicoesLiberadas;           // quantas proposicoes ja aparecem (0 a 4)
+static bool ajudaAceita;
+static bool mostrarPrimeiroPasso;           // fala da IA depois de aceitar a ajuda
+
+static float tempoAvisoErro;                // segundos restantes do aviso "Senha incorreta"
+static float tempoAcerto;                   // pausa depois de acertar
+static float tempoRevelou[SENHA_TAMANHO];   // brilho do card que acabou de revelar
 
 // ---------- posicoes (tela 1280 x 720) ----------
 static const Rectangle PAINEL_LIA = { 440, 140, 400, 90 };
@@ -86,7 +94,6 @@ static const Rectangle BOTAO_IR   = { 774, 172, 46, 46 };
 static const Rectangle POPUP      = { 330, 210, 620, 250 };
 static const Rectangle BOTAO_1    = { 395, 345, 490, 40 };
 static const Rectangle BOTAO_2    = { 395, 395, 490, 40 };
-static const Rectangle BOTAO_TENTAR_DE_NOVO = { 880, 630, 370, 56 };  // canto do quarto
 
 #define CAMPO_X0     550
 #define CAMPO_Y      172
@@ -117,52 +124,59 @@ static Rectangle RetanguloCampo(int i)
     return (Rectangle){ CAMPO_X0 + i * (CAMPO_LADO + CAMPO_ESPACO), CAMPO_Y, CAMPO_LADO, CAMPO_LADO };
 }
 
-static bool FragmentoUsado(int f)
-{
-    for (int i = 0; i < quantidade; i++) {
-        if (campos[i] == f) return true;
-    }
-    return false;
-}
-
 static void LimparCampos(void)
 {
-    for (int i = 0; i < SENHA_TAMANHO; i++) campos[i] = -1;
+    memset(campos, 0, sizeof(campos));
     quantidade = 0;
 }
 
-static void ColocarFragmento(int f)
+// Aceita letras e algarismos; letras viram maiusculas.
+static void DigitarCaractere(int c)
 {
-    if (quantidade < SENHA_TAMANHO && !FragmentoUsado(f)) {
-        campos[quantidade++] = f;
-    }
+    if (c >= 'a' && c <= 'z') c -= 32;
+    bool valido = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+    if (valido && quantidade < SENHA_TAMANHO) campos[quantidade++] = (char)c;
 }
 
-static void DevolverUltimo(void)
+static void ApagarUltimo(void)
 {
-    if (quantidade > 0) campos[--quantidade] = -1;
+    if (quantidade > 0) campos[--quantidade] = '\0';
+}
+
+// Revela no card cada caractere da tentativa que faz parte da senha.
+static void RevelarCards(void)
+{
+    for (int i = 0; i < SENHA_TAMANHO; i++) {
+        for (int f = 0; f < SENHA_TAMANHO; f++) {
+            if (campos[i] == FRAGMENTOS[f].letra && !descoberto[f]) {
+                descoberto[f] = true;
+                tempoRevelou[f] = 1.0f;
+            }
+        }
+    }
 }
 
 static void ConferirTentativa(void)
 {
-    char tentativa[SENHA_TAMANHO + 1];
-    for (int i = 0; i < SENHA_TAMANHO; i++) tentativa[i] = FRAGMENTOS[campos[i]].letra;
-    tentativa[SENHA_TAMANHO] = '\0';
+    RevelarCards();
 
-    if (strcmp(tentativa, SENHA_CORRETA) == 0) {
+    if (strcmp(campos, SENHA_CORRETA) == 0) {
         estado = SENHA_ACERTOU;
         tempoAcerto = 1.0f;
         return;
     }
 
     erros++;
-    LimparCampos();               // os fragmentos voltam para a mesa
+    if (proposicoesLiberadas < QTD_PROPOSICOES) proposicoesLiberadas++;
+    LimparCampos();
     tempoAvisoErro = 1.5f;
 
-    if (erros >= SENHA_LIMITE_ERROS) {
-        estado = SENHA_FALA_SAIDA;
-    } else if (!ajudaAceita && erros == SENHA_ERRO_AJUDA) {
-        estado = SENHA_POPUP_IA;  // 3o erro da rodada
+    if (erros >= SENHA_ERROS_RODADA) {
+        if (ajudaAceita) {
+            erros = 0;                // sem pop-up: so comeca outra rodada
+        } else {
+            estado = SENHA_POPUP_IA;  // 5o erro da rodada
+        }
     }
 }
 
@@ -171,13 +185,15 @@ static void EscolherPrimeiroPasso(void)
     Tokens_Gastar();
     ajudaAceita = true;
     mostrarPrimeiroPasso = true;
-    estado = SENHA_MONTANDO;
+    erros = 0;
+    estado = SENHA_DIGITANDO;
 }
 
 static void EscolherTentarSozinha(void)
 {
     Tokens_Recuperar();
-    estado = SENHA_MONTANDO;
+    erros = 0;
+    estado = SENHA_DIGITANDO;
 }
 
 // Botao com mudanca de cor quando o mouse passa por cima (US11).
@@ -202,12 +218,17 @@ void Senha_ComecarJogo(void)
 {
     ajudaAceita = false;
     mostrarPrimeiroPasso = false;
+    proposicoesLiberadas = 0;
+    for (int f = 0; f < SENHA_TAMANHO; f++) {
+        descoberto[f] = false;
+        tempoRevelou[f] = 0.0f;
+    }
     Senha_Iniciar();
 }
 
 void Senha_Iniciar(void)
 {
-    estado = SENHA_MONTANDO;
+    estado = SENHA_DIGITANDO;
     LimparCampos();
     erros = 0;
     tempoAvisoErro = 0.0f;
@@ -218,28 +239,19 @@ void Senha_Atualizar(void)
 {
     float dt = GetFrameTime();
     if (tempoAvisoErro > 0.0f) tempoAvisoErro -= dt;
+    for (int f = 0; f < SENHA_TAMANHO; f++) {
+        if (tempoRevelou[f] > 0.0f) tempoRevelou[f] -= dt;
+    }
 
     switch (estado) {
-    case SENHA_MONTANDO: {
-        // teclado: K, 7, Y ou 2
+    case SENHA_DIGITANDO: {
         int tecla = GetCharPressed();
         while (tecla > 0) {
-            for (int f = 0; f < SENHA_TAMANHO; f++) {
-                char c = FRAGMENTOS[f].letra;
-                if (tecla == c || (c >= 'A' && c <= 'Z' && tecla == c + 32)) ColocarFragmento(f);
-            }
+            DigitarCaractere(tecla);
             tecla = GetCharPressed();
         }
 
-        // mouse: clique num fragmento
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            Vector2 m = GetMousePosition();
-            for (int f = 0; f < SENHA_TAMANHO; f++) {
-                if (CheckCollisionPointRec(m, RetanguloFragmento(f))) ColocarFragmento(f);
-            }
-        }
-
-        if (IsKeyPressed(KEY_BACKSPACE)) DevolverUltimo();
+        if (IsKeyPressed(KEY_BACKSPACE)) ApagarUltimo();
 
         bool confirmar = IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) ||
                          Botao(BOTAO_IR, "", false);
@@ -259,15 +271,7 @@ void Senha_Atualizar(void)
         if (tempoAcerto <= 0.0f) estado = SENHA_FIM;
         break;
 
-    case SENHA_FALA_SAIDA:
-        if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER) ||
-            IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            estado = SENHA_SAIU;
-        }
-        break;
-
     case SENHA_FIM:
-    case SENHA_SAIU:
         break;
     }
 }
@@ -306,14 +310,12 @@ static void DesenharLoginESenha(bool acertou)
         DrawRectangleRec(c, WHITE);
         DrawRectangleLinesEx(c, 3.0f, borda);
 
-        char letra[2] = { 0 };
-        if (acertou) letra[0] = SENHA_CORRETA[i];
-        else if (campos[i] >= 0) letra[0] = FRAGMENTOS[campos[i]].letra;
+        char letra[2] = { acertou ? SENHA_CORRETA[i] : campos[i], '\0' };
         if (letra[0]) TextoCentralizado(letra, c.x + CAMPO_LADO / 2.0f, c.y + 9, 30, COR_MARINHO);
     }
 
     // seta verde (confirmar)
-    bool pode = (quantidade == SENHA_TAMANHO) && estado == SENHA_MONTANDO;
+    bool pode = (quantidade == SENHA_TAMANHO) && estado == SENHA_DIGITANDO;
     bool emCima = CheckCollisionPointRec(GetMousePosition(), BOTAO_IR);
     DrawRectangleRounded(BOTAO_IR, 0.2f, 6, pode ? (emCima ? COR_AZUL : COR_VERDE) : COR_AZUL_MED);
     DrawRectangleRoundedLinesEx(BOTAO_IR, 0.2f, 6, 2.0f, COR_CLARA);
@@ -332,32 +334,36 @@ static void DesenharLoginESenha(bool acertou)
     if (acertou) {
         TextoCentralizado("Senha correta!", 640, 276, 18, COR_VERDE);
     } else if (tempoAvisoErro > 0.0f) {
-        TextoCentralizado(TextFormat("Senha incorreta. Tentativas erradas: %d de %d", erros, SENHA_LIMITE_ERROS),
+        TextoCentralizado(TextFormat("Senha incorreta. Tentativas erradas: %d de %d", erros, SENHA_ERROS_RODADA),
                           640, 276, 18, COR_VERMELHO);
     } else if (erros > 0) {
-        TextoCentralizado(TextFormat("Tentativas erradas: %d de %d", erros, SENHA_LIMITE_ERROS),
+        TextoCentralizado(TextFormat("Tentativas erradas: %d de %d", erros, SENHA_ERROS_RODADA),
                           640, 276, 18, (Color){ 255, 208, 220, 255 });
     }
 }
 
 static void DesenharFragmentos(void)
 {
-    Vector2 m = GetMousePosition();
     for (int f = 0; f < SENHA_TAMANHO; f++) {
         Rectangle r = RetanguloFragmento(f);
-        bool usado = FragmentoUsado(f);
-        bool emCima = !usado && estado == SENHA_MONTANDO && CheckCollisionPointRec(m, r);
-        float a = usado ? 0.35f : 1.0f;
+        bool brilho = tempoRevelou[f] > 0.0f;
 
-        DrawRectangleRounded((Rectangle){ r.x + 3, r.y + 4, r.width, r.height }, 0.15f, 8, Fade(BLACK, 0.2f * a));
-        DrawRectangleRounded(r, 0.15f, 8, Fade(emCima ? WHITE : COR_CLARA, a));
-        DrawRectangleRoundedLinesEx(r, 0.15f, 8, 2.0f, Fade(emCima ? COR_ROSA : COR_AZUL, a));
+        DrawRectangleRounded((Rectangle){ r.x + 3, r.y + 4, r.width, r.height }, 0.15f, 8, Fade(BLACK, 0.2f));
+        DrawRectangleRounded(r, 0.15f, 8, COR_CLARA);
+        DrawRectangleRoundedLinesEx(r, 0.15f, 8, brilho ? 3.0f : 2.0f, brilho ? COR_VERDE : COR_AZUL);
 
         float cx = r.x + r.width / 2.0f;
-        TextoCentralizado(FRAGMENTOS[f].nome, cx, r.y + 8, 14, Fade(COR_ROSA, a));
-        char letra[2] = { FRAGMENTOS[f].letra, '\0' };
-        TextoCentralizado(letra, cx, r.y + 26, 36, Fade(COR_MARINHO, a));
-        TextoCentralizado(FRAGMENTOS[f].pista, cx, r.y + 66, 12, Fade((Color){ 74, 90, 128, 255 }, a));
+        TextoCentralizado(FRAGMENTOS[f].nome, cx, r.y + 8, 14, COR_ROSA);
+
+        if (descoberto[f]) {
+            char letra[2] = { FRAGMENTOS[f].letra, '\0' };
+            TextoCentralizado(letra, cx, r.y + 26, 36, brilho ? COR_VERDE : COR_MARINHO);
+        } else {
+            DrawRectangleRounded((Rectangle){ cx - 18, r.y + 28, 36, 30 }, 0.3f, 6, Fade(COR_AZUL_MED, 0.35f));
+            TextoCentralizado("?", cx, r.y + 30, 28, COR_MARINHO);
+        }
+
+        TextoCentralizado(FRAGMENTOS[f].pista, cx, r.y + 66, 13, (Color){ 40, 52, 100, 255 });
     }
 }
 
@@ -366,13 +372,23 @@ static void DesenharLogica(void)
     Rectangle esq = { 140, 402, 490, 150 };
     Rectangle dir = { 650, 402, 490, 150 };
 
+    // proposicoes: uma por erro, as outras bloqueadas
     DrawRectangleRounded(esq, 0.08f, 8, Fade(COR_MARINHO, 0.5f));
     DrawRectangleRoundedLinesEx(esq, 0.08f, 8, 1.0f, COR_AZUL_MED);
     DrawText("PROPOSIÇÕES", (int)esq.x + 16, (int)esq.y + 10, 14, COR_AZUL_MED);
-    for (int i = 0; i < 4; i++) {
-        DrawText(PROPOSICOES[i], (int)esq.x + 16, (int)esq.y + 34 + i * 27, 18, COR_CLARA);
+    for (int i = 0; i < QTD_PROPOSICOES; i++) {
+        int y = (int)esq.y + 34 + i * 27;
+        if (i < proposicoesLiberadas) {
+            DrawText(PROPOSICOES[i], (int)esq.x + 16, y, 16, COR_CLARA);
+        } else {
+            char nome[2] = { "pqrs"[i], '\0' };
+            DrawText(nome, (int)esq.x + 16, y, 16, Fade(COR_CLARA, 0.5f));
+            DrawRectangleRounded((Rectangle){ esq.x + 44, (float)y - 2, 250, 22 }, 0.5f, 6, Fade(COR_CLARA, 0.12f));
+            DrawText(TextFormat("aparece no %dº erro", i + 1), (int)esq.x + 56, y + 1, 16, Fade(COR_CLARA, 0.5f));
+        }
     }
 
+    // expressoes: desde o inicio, com o resultado
     DrawRectangleRounded(dir, 0.08f, 8, Fade(COR_MARINHO, 0.5f));
     DrawRectangleRoundedLinesEx(dir, 0.08f, 8, 1.0f, COR_AZUL_MED);
     DrawText("EXPRESSÕES", (int)dir.x + 16, (int)dir.y + 10, 14, COR_AZUL_MED);
@@ -389,8 +405,8 @@ static void DesenharLogica(void)
         Rectangle r = { 140, 562, 1000, 30 };
         DrawRectangleRounded(r, 0.4f, 8, Fade(COR_CLARA, 0.9f));
         DrawCircle((int)r.x + 16, (int)r.y + 15, 6, COR_VERDE);
-        DrawText("IA: p ^ q é verdadeira, então p e q também são: Y vem antes de K, e 2 vem antes de 7. O resto é com você.",
-                 (int)r.x + 30, (int)r.y + 7, 16, COR_MARINHO);
+        DrawText("IA: p ^ q é verdadeira, então p e q também são: o Fragmento C vem antes do A, e o D vem antes do B. O resto é com você.",
+                 (int)r.x + 30, (int)r.y + 7, 15, COR_MARINHO);
     }
 }
 
@@ -403,10 +419,10 @@ void Senha_Desenhar(void)
     DesenharFragmentos();
     DesenharLogica();
 
-    TextoCentralizado("Clique nos fragmentos (ou digite K, 7, Y, 2). ENTER confirma. BACKSPACE devolve.",
+    TextoCentralizado("Digite a senha no teclado. ENTER confirma. BACKSPACE apaga.",
                       640, 670, 18, COR_CLARA);
 
-    // Pop-up de MSN da IA (3o erro)
+    // Pop-up de MSN da IA (5o erro)
     if (estado == SENHA_POPUP_IA) {
         DrawRectangle(0, 0, 1280, 720, Fade(BLACK, 0.4f));
 
@@ -417,7 +433,7 @@ void Senha_Desenhar(void)
         DrawText("IA (online)", (int)POPUP.x + 35, (int)POPUP.y + 8, 20, COR_CLARA);
 
         DrawText("IA diz:", (int)POPUP.x + 25, (int)POPUP.y + 55, 18, COR_AZUL);
-        DrawText("Três tentativas erradas. Posso fazer o primeiro",
+        DrawText("Cinco tentativas erradas. Posso fazer o primeiro",
                  (int)POPUP.x + 25, (int)POPUP.y + 80, 20, COR_MARINHO);
         DrawText("passo da dedução com você ou você tenta de novo.",
                  (int)POPUP.x + 25, (int)POPUP.y + 105, 20, COR_MARINHO);
@@ -425,59 +441,9 @@ void Senha_Desenhar(void)
         Botao(BOTAO_1, "1. Fazer o primeiro passo (-1 token)", true);
         Botao(BOTAO_2, "2. Tentar de novo sozinha", true);
     }
-
-    // Fala da LIA no 5o erro, numa caixa de dialogo
-    if (estado == SENHA_FALA_SAIDA) {
-        DrawRectangle(0, 0, 1280, 720, Fade(BLACK, 0.4f));
-        Rectangle caixa = { 40, 540, 1200, 150 };
-        DrawRectangleRounded(caixa, 0.15f, 8, Fade(COR_CLARA, 0.95f));
-        DrawRectangleRoundedLinesEx(caixa, 0.15f, 8, 3.0f, COR_AZUL);
-        DrawText("LIA", (int)caixa.x + 30, (int)caixa.y + 20, 24, COR_ROSA);
-        DrawText("Calma. Vou respirar um pouco e tentar de novo.",
-                 (int)caixa.x + 30, (int)caixa.y + 60, 24, COR_MARINHO);
-        DrawText("ENTER para continuar", (int)(caixa.x + caixa.width) - 230,
-                 (int)(caixa.y + caixa.height) - 35, 18, COR_AZUL_MED);
-    }
-}
-
-// ---------- botao "Tentar a senha novamente" (cena do quarto) ----------
-bool Senha_BotaoTentarDeNovoClicado(void)
-{
-    if (estado != SENHA_SAIU) return false;
-    return Botao(BOTAO_TENTAR_DE_NOVO, "", false);
-}
-
-void Senha_DesenharBotaoTentarDeNovo(void)
-{
-    if (estado != SENHA_SAIU) return;
-
-    Rectangle r = BOTAO_TENTAR_DE_NOVO;
-    bool emCima = CheckCollisionPointRec(GetMousePosition(), r);
-
-    // sombra, corpo com degrade e reflexo de vidro (estilo XP / Frutiger Aero)
-    DrawRectangleRounded((Rectangle){ r.x + 3, r.y + 4, r.width, r.height }, 0.5f, 10, Fade(BLACK, 0.3f));
-    DrawRectangleRounded(r, 0.5f, 10, emCima ? COR_ROSA : COR_AZUL);
-    DrawRectangleRounded((Rectangle){ r.x + 4, r.y + 3, r.width - 8, r.height * 0.3f },
-                         1.0f, 8, Fade(WHITE, emCima ? 0.25f : 0.3f));
-    DrawRectangleRoundedLinesEx(r, 0.5f, 10, 2.0f, emCima ? COR_CLARA : COR_MARINHO);
-
-    // icone: cadeado simples
-    float ix = r.x + 34, iy = r.y + 14;
-    DrawRing((Vector2){ ix + 10, iy + 10 }, 5, 8, 180, 360, 12, WHITE);
-    DrawRectangleRounded((Rectangle){ ix, iy + 10, 20, 16 }, 0.3f, 4, WHITE);
-    DrawCircle((int)ix + 10, (int)iy + 17, 2, emCima ? COR_ROSA : COR_AZUL);
-
-    const char *texto = "Tentar a senha novamente";
-    DrawText(texto, (int)r.x + 76 + 1, (int)r.y + 19, 20, Fade(COR_MARINHO, 0.6f));
-    DrawText(texto, (int)r.x + 76, (int)r.y + 18, 20, WHITE);
 }
 
 bool Senha_Concluida(void)
 {
     return estado == SENHA_FIM;
-}
-
-bool Senha_PrecisaVoltarAoQuarto(void)
-{
-    return estado == SENHA_SAIU;
 }

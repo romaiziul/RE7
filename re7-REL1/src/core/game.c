@@ -1004,29 +1004,13 @@ void UpdateGame(GameState *game)
             return;
         }
 
-        if (game->senhaNoQuarto)
-        {
-            // voltou ao quarto depois de 5 erros
-            if (Senha_BotaoTentarDeNovoClicado())
-            {
-                game->senhaNoQuarto = false;
-                Senha_Iniciar();
-            }
-        }
-        else
-        {
-            Senha_Atualizar();
+        Senha_Atualizar();
 
-            if (Senha_Concluida())
-            {
-                game->currentScreen = SCREEN_GAME;
-                ChangeScene(game, SCENE_ATO1_IA_A);
-                SaveGame(game);
-            }
-            else if (Senha_PrecisaVoltarAoQuarto())
-            {
-                game->senhaNoQuarto = true;
-            }
+        if (Senha_Concluida())
+        {
+            game->currentScreen = SCREEN_GAME;
+            ChangeScene(game, SCENE_ATO1_IA_A);
+            SaveGame(game);
         }
 
         return;
@@ -1341,17 +1325,7 @@ void DrawGame(
 
     if (game->currentScreen == SCREEN_SENHA)
     {
-        if (game->senhaNoQuarto)
-        {
-            // voltou ao quarto: botao "Tentar a senha novamente"
-            DesenharImagemTela(assets->bg2007);
-            DrawPersonagem(assets->lia07[1], 900.0f, -101.0f, 1250.0f);
-            Senha_DesenharBotaoTentarDeNovo();
-        }
-        else
-        {
-            Senha_Desenhar();
-        }
+        Senha_Desenhar();
 
         BarraTokens_Desenhar(990, 20);
 
