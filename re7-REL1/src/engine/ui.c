@@ -1,5 +1,7 @@
 #include "ui.h"
 
+#include <stdio.h>
+
 
 // =====================================================
 // TEXTO CENTRALIZADO
@@ -142,11 +144,73 @@ bool IsButtonClicked(
 // CAIXA DE DIÁLOGO
 // =====================================================
 
+// Escreve um texto quebrando em linhas dentro de "larguraMax".
+// Retorna quantas linhas foram usadas.
+static int DrawWrappedText(
+    const char *text,
+    int x,
+    int y,
+    int fontSize,
+    int lineHeight,
+    int larguraMax,
+    Color color
+)
+{
+    char linha[1000] = "";
+    int linhas = 0;
+    int pos = 0;
+
+    while (text[pos] != '\0')
+    {
+        // pega a proxima palavra
+        char palavra[128] = "";
+        int n = 0;
+
+        while (text[pos] != '\0' && text[pos] != ' ' && n < 127)
+        {
+            palavra[n++] = text[pos++];
+        }
+        palavra[n] = '\0';
+
+        while (text[pos] == ' ') pos++;
+
+        // testa se a palavra cabe na linha atual
+        char teste[1200];
+
+        if (linha[0] == '\0')
+            snprintf(teste, sizeof(teste), "%s", palavra);
+        else
+            snprintf(teste, sizeof(teste), "%s %s", linha, palavra);
+
+        if (MeasureText(teste, fontSize) > larguraMax && linha[0] != '\0')
+        {
+            DrawText(linha, x, y + linhas * lineHeight, fontSize, color);
+            linhas++;
+            snprintf(linha, sizeof(linha), "%s", palavra);
+        }
+        else
+        {
+            snprintf(linha, sizeof(linha), "%s", teste);
+        }
+    }
+
+    if (linha[0] != '\0')
+    {
+        DrawText(linha, x, y + linhas * lineHeight, fontSize, color);
+        linhas++;
+    }
+
+    return linhas;
+}
+
+
 void DrawDialogueBox(
     const char *speaker,
     const char *text
 )
 {
+    // fala vazia: nao desenha a caixa (usado nas imagens de cena)
+    if (text[0] == '\0' && speaker[0] == '\0') return;
 
     Rectangle box =
     {
@@ -168,25 +232,28 @@ void DrawDialogueBox(
     DrawText(
         speaker,
         160,
-        545,
+        538,
         26,
         PINK
     );
 
 
-    DrawText(
+    // texto com quebra de linha (ate 3 linhas)
+    DrawWrappedText(
         text,
         160,
-        590,
-        28,
+        578,
+        26,
+        32,
+        880,
         WHITE
     );
 
 
     DrawText(
         ">>",
-        1080,
-        635,
+        1090,
+        640,
         28,
         SKYBLUE
     );

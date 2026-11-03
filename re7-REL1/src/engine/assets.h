@@ -31,8 +31,28 @@ typedef struct
 
     // personagens
 
-    Texture2D liaJovemLado;
-    Texture2D liaFrente;
+    Texture2D liaJovemLado;     // = lia07[0] (mesma imagem, nao descarregar duas vezes)
+    Texture2D liaFrente;        // = lia26[0]
+
+    // Lia adulta (2026): 0 neutra, 1 preocupada, 2 decidida
+    Texture2D lia26[3];
+
+    // Lia adolescente (2007): 0 neutra, 1 confusa, 2 brava, 3 surpresa,
+    // 4 contrariada, 5 nostalgica, 6 rindo
+    Texture2D lia07[7];
+
+    // amigo: 0 neutro, 1 feliz
+    Texture2D amigo[2];
+
+
+    // Ato 1 e Ato 2: cenarios e imagens de cena
+
+    Texture2D cgTela2026;       // rosto da Lia iluminado pela tela (Ato 1, cena 1)
+    Texture2D bgCorredor;       // corredor da escola (Ato 2)
+    Texture2D poster;           // poster do concurso de oratoria (Ato 2)
+    Texture2D cgEscrevem;       // Lia e o amigo escrevendo o discurso
+    Texture2D cgProfessora;     // a professora corrigindo
+    Texture2D cgEnsaio;         // Lia ensaiando
 
 } Assets;
 

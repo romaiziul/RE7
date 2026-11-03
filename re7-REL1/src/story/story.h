@@ -3,16 +3,11 @@
 
 #include "scenes.h"
 
-extern Dialogue presentDialogues[];
-extern Dialogue room2007Dialogues[];
-extern Dialogue room2007ChallengeDialogues[];
-extern Dialogue room2007WinDialogues[];
+// Epilogo (provisorio, ate o Ato 3 ser feito).
+// As falas dos atos ficam em src/atos/atoN/story_atoN.c
+
 extern Dialogue epilogueDialogues[];
 
-int GetPresentDialogueCount(void);
-int GetRoom2007DialogueCount(void);
-int GetRoom2007ChallengeDialogueCount(void);
-int GetRoom2007WinDialogueCount(void);
 int GetEpilogueDialogueCount(void);
 
 #endif

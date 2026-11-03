@@ -37,11 +37,45 @@ void LoadAssets(Assets *assets)
     assets->iaStar = LoadTexture("assets/comum/iaStar.png");
 
 
-    // PERSONAGEM
+    // PERSONAGENS
 
-    assets->liaFrente = LoadTexture("assets/comum/lia26_neutra.png");
+    static const char *lia26Paths[3] =
+    {
+        "assets/comum/lia26_neutra.png",
+        "assets/comum/lia26_preocupada.png",
+        "assets/comum/lia26_decidida.png"
+    };
 
-    assets->liaJovemLado = LoadTexture("assets/comum/lia07_neutra.png");
+    static const char *lia07Paths[7] =
+    {
+        "assets/comum/lia07_neutra.png",
+        "assets/comum/lia07_confusa.png",
+        "assets/comum/lia07_brava.png",
+        "assets/comum/lia07_surpresa.png",
+        "assets/comum/lia07_contrariada.png",
+        "assets/comum/lia07_nostalgica.png",
+        "assets/comum/lia07_rindo.png"
+    };
+
+    for (int i = 0; i < 3; i++) assets->lia26[i] = LoadTexture(lia26Paths[i]);
+    for (int i = 0; i < 7; i++) assets->lia07[i] = LoadTexture(lia07Paths[i]);
+
+    assets->liaFrente = assets->lia26[0];
+    assets->liaJovemLado = assets->lia07[0];
+
+    assets->amigo[0] = LoadTexture("assets/comum/amigo_neutro.png");
+    assets->amigo[1] = LoadTexture("assets/comum/amigo_feliz.png");
+
+
+    // ATO 1 E ATO 2
+
+    assets->cgTela2026 = LoadTexture("assets/ato1/ato1_cg_tela2026.png");
+
+    assets->bgCorredor = LoadTexture("assets/ato2/ato2_corredor.png");
+    assets->poster = LoadTexture("assets/ato2/ato2_poster.png");
+    assets->cgEscrevem = LoadTexture("assets/ato2/ato2_cg_escrevem.png");
+    assets->cgProfessora = LoadTexture("assets/ato2/ato2_cg_professora.png");
+    assets->cgEnsaio = LoadTexture("assets/ato2/ato2_cg_ensaio.png");
 }
 
 
@@ -55,8 +89,16 @@ void UnloadAssets(Assets *assets)
         for (int j = 0; j < 3; j++)
             UnloadTexture(assets->menuButtons[i][j]);
 
-    UnloadTexture(assets->liaFrente);
-    UnloadTexture(assets->liaJovemLado);
+    for (int i = 0; i < 3; i++) UnloadTexture(assets->lia26[i]);
+    for (int i = 0; i < 7; i++) UnloadTexture(assets->lia07[i]);
+    for (int i = 0; i < 2; i++) UnloadTexture(assets->amigo[i]);
+
+    UnloadTexture(assets->cgTela2026);
+    UnloadTexture(assets->bgCorredor);
+    UnloadTexture(assets->poster);
+    UnloadTexture(assets->cgEscrevem);
+    UnloadTexture(assets->cgProfessora);
+    UnloadTexture(assets->cgEnsaio);
     UnloadTexture(assets->logo);
     UnloadTexture(assets->iaStar);
 }
