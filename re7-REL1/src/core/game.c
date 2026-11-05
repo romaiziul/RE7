@@ -3,6 +3,12 @@
 #include "ui.h"
 #include "scenes.h"
 #include "minigame.h"
+#include "ato2_corrida.h"
+#include "story_ato1.h"
+#include "story_ato2.h"
+#include "senha.h"
+#include "tokens.h"
+#include "barra_tokens.h"
 #include "room.h"
 #include "audio_manager.h"
 #include <math.h>
@@ -60,8 +66,18 @@ static void SaveGame(GameState *game)
 {
     SaveFileText(
         SAVE_FILE,
-        (char *)TextFormat("%d %d", (int)game->currentScene, game->dialogueIndex)
+        (char *)TextFormat("%d %d %d", (int)game->currentScene, game->dialogueIndex, Tokens_Valor())
     );
+}
+
+// Poe a barra de tokens no valor pedido (0 a 3)
+static void DefinirTokens(int valor)
+{
+    Tokens_Reiniciar();
+
+    for (int i = TOKENS_MAX; i > valor; i--) Tokens_Gastar();
+
+    BarraTokens_Reiniciar();
 }
 
 // Retorna true se conseguiu carregar um save valido
@@ -75,14 +91,18 @@ static bool LoadGame(GameState *game)
 
     int scene = 0;
     int index = 0;
+    int tokens = TOKENS_MAX;
 
-    int lidos = sscanf(text, "%d %d", &scene, &index);
+    int lidos = sscanf(text, "%d %d %d", &scene, &index, &tokens);
 
     UnloadFileText(text);
 
-    if (lidos != 2) return false;
+    // saves antigos (so cena e fala) sao ignorados
+    if (lidos != 3) return false;
 
     if (scene < 0 || scene >= SCENE_COUNT) return false;
+
+    if (tokens < 0 || tokens > TOKENS_MAX) tokens = TOKENS_MAX;
 
     Scene s = GetScene((SceneID)scene);
 
@@ -90,6 +110,9 @@ static bool LoadGame(GameState *game)
 
     game->currentScene = (SceneID)scene;
     game->dialogueIndex = index;
+    game->choice = 0;
+
+    DefinirTokens(tokens);
 
     return true;
 }
@@ -109,7 +132,15 @@ static float avisoInvalido = 0.0f;
 
 // Controles do painel de audio
 static Rectangle audioFechar = {1040, 80, 100, 45};
-static Rectangle audioAbrir = {1090, 18, 160, 44};
+static Rectangle audioAbrir = {14, 14, 40, 40};
+
+// Posicao da engrenagem: canto superior esquerdo (na tela da senha, canto inferior,
+// porque o cabecalho da senha ocupa o topo)
+static void PosicionarEngrenagem(GameState *game)
+{
+    audioAbrir.x = 14.0f;
+    audioAbrir.y = (game->currentScreen == SCREEN_SENHA) ? 666.0f : 14.0f;
+}
 static Rectangle audioTestar = {470, 430, 220, 55};
 static Rectangle audioMudo = {470, 500, 220, 55};
 static Rectangle sliderMusica = {400, 270, 400, 12};
@@ -256,11 +287,12 @@ static void AtualizarMusica(GameState *game)
             break;
 
         case SCREEN_ROOM:
+        case SCREEN_SENHA:
             AudioManager_PlayMusic(MUSICA_2007);
             break;
 
-        case SCREEN_MINIGAME:
-            // A musica do minigame e controlada em minigame.c.
+        case SCREEN_CORRIDA:
+            // A musica da corrida e controlada em ato2_corrida.c.
             break;
 
         case SCREEN_GAME:
@@ -277,15 +309,10 @@ static void AtualizarMusica(GameState *game)
                     );
                     break;
 
-                case SCENE_2007:
-                case SCENE_2007_CHALLENGE:
-                    AudioManager_PlayMusic(MUSICA_2007);
-                    break;
-
-                case SCENE_2007_WIN:
-                    AudioManager_PlayMusic(
-                        ultimaFala ? MUSICA_RETORNO : MUSICA_VITORIA
-                    );
+                case SCENE_ATO2_CG_ESCREVEM:
+                case SCENE_ATO2_CG_PROFESSORA:
+                case SCENE_ATO2_CG_ENSAIO:
+                    AudioManager_PlayMusic(MUSICA_VITORIA);
                     break;
 
                 case SCENE_EPILOGUE:
@@ -293,6 +320,8 @@ static void AtualizarMusica(GameState *game)
                     break;
 
                 default:
+                    // Ato 1 e Ato 2
+                    AudioManager_PlayMusic(MUSICA_2007);
                     break;
             }
             break;
@@ -301,6 +330,388 @@ static void AtualizarMusica(GameState *game)
         default:
             break;
     }
+}
+
+
+// =====================================================
+// VISUAL DE CADA CENA (fundo e personagens)
+// =====================================================
+
+typedef enum
+{
+    FUNDO_2026,
+    FUNDO_2007,
+    FUNDO_CORREDOR,
+    FUNDO_LANHOUSE,
+    FUNDO_CG_TELA,
+    FUNDO_CG_ESCREVEM,
+    FUNDO_CG_PROFESSORA,
+    FUNDO_CG_ENSAIO
+} FundoId;
+
+typedef struct
+{
+    FundoId fundo;
+    int lia;            // 0 = nao aparece, 2026 ou 2007
+    bool amigo;         // true = o amigo aparece a esquerda
+} VisualCena;
+
+static VisualCena VisualDaCena(SceneID id)
+{
+    switch (id)
+    {
+        case SCENE_PRESENT:             return (VisualCena){ FUNDO_CG_TELA,        0,    false };
+
+        case SCENE_2007:
+        case SCENE_2007_PC:
+        case SCENE_ATO1_IA_A:
+        case SCENE_ATO1_IA_B:
+        case SCENE_ATO2_QUARTO:         return (VisualCena){ FUNDO_2007,           2007, false };
+
+        case SCENE_ATO2_CORREDOR:
+        case SCENE_ATO2_POSTER:         return (VisualCena){ FUNDO_CORREDOR,       2007, true  };
+
+        case SCENE_ATO2_LANHOUSE:
+        case SCENE_ATO2_IA_ESCREVE:
+        case SCENE_ATO2_UMA_IDEIA:
+        case SCENE_ATO2_FECHAR:         return (VisualCena){ FUNDO_LANHOUSE,       2007, false };
+
+        case SCENE_ATO2_DISCURSO:
+        case SCENE_ATO2_ENSAIO:         return (VisualCena){ FUNDO_LANHOUSE,       2007, true  };
+
+        case SCENE_ATO2_CG_ESCREVEM:    return (VisualCena){ FUNDO_CG_ESCREVEM,    0,    false };
+        case SCENE_ATO2_CG_PROFESSORA:  return (VisualCena){ FUNDO_CG_PROFESSORA,  0,    false };
+        case SCENE_ATO2_CG_ENSAIO:      return (VisualCena){ FUNDO_CG_ENSAIO,      0,    false };
+
+        case SCENE_EPILOGUE:            return (VisualCena){ FUNDO_2026,           2026, false };
+
+        default:                        return (VisualCena){ FUNDO_2026,           2026, false };
+    }
+}
+
+// Expressao da ultima fala (ate a fala atual) de quem esta em "quem"
+static Pose PoseDe(const Scene *scene, int indice, const char *quem)
+{
+    for (int i = indice; i >= 0; i--)
+    {
+        if (strcmp(scene->dialogues[i].speaker, quem) == 0)
+            return scene->dialogues[i].pose;
+    }
+
+    return POSE_PADRAO;
+}
+
+static Texture2D TexturaLia(Assets *assets, int era, Pose pose)
+{
+    if (era == 2026)
+    {
+        switch (pose)
+        {
+            case POSE_PREOCUPADA: return assets->lia26[1];
+            case POSE_DECIDIDA:   return assets->lia26[2];
+            default:              return assets->lia26[0];
+        }
+    }
+
+    switch (pose)
+    {
+        case POSE_CONFUSA:      return assets->lia07[1];
+        case POSE_BRAVA:        return assets->lia07[2];
+        case POSE_SURPRESA:     return assets->lia07[3];
+        case POSE_CONTRARIADA:  return assets->lia07[4];
+        case POSE_NOSTALGICA:   return assets->lia07[5];
+        case POSE_RINDO:        return assets->lia07[6];
+        default:                return assets->lia07[0];
+    }
+}
+
+// Preenche a tela inteira com uma imagem
+static void DesenharImagemTela(Texture2D tex)
+{
+    DrawTexturePro(
+        tex,
+        (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
+        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Vector2){ 0, 0 },
+        0.0f,
+        WHITE
+    );
+}
+
+// Cenario provisorio da lan house (a arte definitiva ainda sera feita)
+static void DesenharLanHouse(void)
+{
+    float tempo = (float)GetTime();
+
+    DrawRectangleGradientV(0, 0, 1280, 720, (Color){22, 20, 58, 255}, (Color){66, 36, 100, 255});
+
+    // fileira de monitores ao fundo
+    for (int i = 0; i < 6; i++)
+    {
+        float x = 70.0f + i * 200.0f;
+        float y = 200.0f;
+        float brilho = 0.30f + 0.10f * sinf(tempo * 2.0f + i);
+
+        DrawRectangleRounded((Rectangle){ x, y, 150, 110 }, 0.12f, 6, (Color){ 18, 18, 34, 255 });
+        DrawRectangle((int)x + 10, (int)y + 10, 130, 80, Fade((Color){ 80, 200, 255, 255 }, brilho));
+        DrawRectangle((int)x + 62, (int)y + 110, 26, 22, (Color){ 18, 18, 34, 255 });
+    }
+
+    // bancada
+    DrawRectangle(0, 360, 1280, 360, (Color){ 40, 26, 72, 255 });
+    DrawRectangle(0, 360, 1280, 6, (Color){ 255, 105, 200, 255 });
+}
+
+
+// =====================================================
+// ESCOLHAS (aparecem sobre a propria tela de dialogo)
+// =====================================================
+
+typedef enum
+{
+    ESCOLHA_NENHUMA = 0,
+    ESCOLHA_ANO,        // Ato 1: em que ano voce esta?
+    ESCOLHA_AMIGO,      // Ato 2: dar uma chance ao amigo
+    ESCOLHA_IA          // Ato 2: o que responder a IA na lan house
+} EscolhaId;
+
+typedef struct
+{
+    const char *pergunta;
+    int total;
+    const char *opcoes[3];
+} Escolha;
+
+static const Escolha ESCOLHAS[] =
+{
+    [ESCOLHA_ANO] =
+    {
+        ATO1_ESCOLHA_ANO_PERGUNTA, 3,
+        { ATO1_ESCOLHA_ANO_A, ATO1_ESCOLHA_ANO_B, ATO1_ESCOLHA_ANO_C }
+    },
+
+    [ESCOLHA_AMIGO] =
+    {
+        ATO2_ESCOLHA1_PERGUNTA, 2,
+        { ATO2_ESCOLHA1_A, ATO2_ESCOLHA1_B, "" }
+    },
+
+    [ESCOLHA_IA] =
+    {
+        ATO2_ESCOLHA2_PERGUNTA, 3,
+        { ATO2_ESCOLHA2_A, ATO2_ESCOLHA2_B, ATO2_ESCOLHA2_C }
+    }
+};
+
+// Opcao errada: pisca em vermelho por um instante e a escolha continua
+static float escolhaErro = 0.0f;
+static int escolhaErroOpcao = -1;
+
+// Area clicavel de cada opcao
+static Rectangle AreaOpcao(int escolha, int indice)
+{
+    float topo = (escolha == ESCOLHA_IA) ? 250.0f : 230.0f;
+
+    return (Rectangle){ 340.0f, topo + indice * 84.0f, 600.0f, 66.0f };
+}
+
+// Janela de MSN (so na escolha da IA)
+static void DesenharPopupMSN(void)
+{
+    Rectangle janela = { 300.0f, 110.0f, 680.0f, 420.0f };
+
+    DrawRectangleRounded(janela, 0.04f, 8, (Color){ 232, 240, 250, 245 });
+    DrawRectangleRounded((Rectangle){ janela.x, janela.y, janela.width, 44.0f }, 0.3f, 8, (Color){ 39, 172, 234, 255 });
+    DrawRectangleRoundedLines(janela, 0.04f, 8, (Color){ 29, 38, 96, 255 });
+
+    DrawCircle((int)janela.x + 26, (int)janela.y + 22, 8, (Color){ 76, 175, 80, 255 });
+    DrawText("IA diz:", (int)janela.x + 44, (int)janela.y + 11, 22, WHITE);
+}
+
+static void DesenharEscolha(GameState *game)
+{
+    const Escolha *e = &ESCOLHAS[game->choice];
+
+    // escurece o fundo
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.45f));
+
+    if (game->choice == ESCOLHA_IA)
+    {
+        DesenharPopupMSN();
+        DrawText(e->pergunta, 340, 175, 28, (Color){ 29, 38, 96, 255 });
+    }
+    else
+    {
+        DrawCenteredText(e->pergunta, 160, 36, WHITE);
+    }
+
+    Vector2 mouse = GetMousePosition();
+
+    for (int i = 0; i < e->total; i++)
+    {
+        Rectangle r = AreaOpcao(game->choice, i);
+        bool sobre = CheckCollisionPointRec(mouse, r);
+        bool erro = (escolhaErro > 0.0f && escolhaErroOpcao == i);
+
+        Color fundo = erro ? (Color){ 200, 60, 90, 255 }
+                           : (sobre ? (Color){ 255, 105, 200, 255 } : (Color){ 29, 38, 96, 235 });
+
+        DrawRectangleRounded(r, 0.3f, 8, fundo);
+        DrawRectangleRoundedLines(r, 0.3f, 8, WHITE);
+
+        const char *texto = TextFormat("%d   %s", i + 1, e->opcoes[i]);
+        int larguraTexto = MeasureText(texto, 26);
+
+        DrawText(texto, (int)(r.x + (r.width - larguraTexto) / 2.0f), (int)r.y + 20, 26, WHITE);
+    }
+}
+
+// Aplica o efeito da opcao escolhida
+static void ResolverEscolha(GameState *game, int opcao)
+{
+    switch (game->choice)
+    {
+        case ESCOLHA_ANO:
+            if (opcao == 2)                         // 2007: certo
+            {
+                game->choice = ESCOLHA_NENHUMA;
+                ChangeScene(game, SCENE_ATO1_IA_B);
+            }
+            else                                    // 2005 ou 2006: a escolha volta
+            {
+                escolhaErro = 0.5f;
+                escolhaErroOpcao = opcao;
+                return;
+            }
+            break;
+
+        case ESCOLHA_AMIGO:
+            if (opcao == 0)                         // dar uma chance ao amigo
+            {
+                game->choice = ESCOLHA_NENHUMA;
+                ChangeScene(game, SCENE_ATO2_POSTER);
+            }
+            else                                    // ignorar: o amigo alcanca e a escolha volta
+            {
+                escolhaErro = 0.5f;
+                escolhaErroOpcao = opcao;
+                return;
+            }
+            break;
+
+        case ESCOLHA_IA:
+            game->choice = ESCOLHA_NENHUMA;
+
+            if (opcao == 0)                         // IA escreve o discurso: zera
+            {
+                Tokens_Zerar();
+                ChangeScene(game, SCENE_ATO2_IA_ESCREVE);
+            }
+            else if (opcao == 1)                    // so uma ideia: -1
+            {
+                Tokens_Gastar();
+                ChangeScene(game, SCENE_ATO2_UMA_IDEIA);
+            }
+            else                                    // fechar a janela: +1
+            {
+                Tokens_Recuperar();
+                ChangeScene(game, SCENE_ATO2_FECHAR);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    SaveGame(game);
+}
+
+static void AtualizarEscolha(GameState *game)
+{
+    if (escolhaErro > 0.0f) escolhaErro -= GetFrameTime();
+
+    const Escolha *e = &ESCOLHAS[game->choice];
+
+    for (int i = 0; i < e->total; i++)
+    {
+        if (IsButtonClicked(AreaOpcao(game->choice, i)) || IsKeyPressed(KEY_ONE + i))
+        {
+            AudioManager_Play(SOM_MOUSE);
+            ResolverEscolha(game, i);
+            return;
+        }
+    }
+}
+
+
+// =====================================================
+// FIM DE CADA CENA: o que acontece depois da ultima fala
+// =====================================================
+
+static void FimDaCena(GameState *game, Scene scene)
+{
+    switch (game->currentScene)
+    {
+        case SCENE_2007:
+            // Fim da chegada em 2007: explorar o quarto.
+            game->dialogueIndex = scene.dialogueCount - 1;
+            SaveGame(game);
+            InitRoom();
+            game->currentScreen = SCREEN_ROOM;
+            return;
+
+        case SCENE_2007_PC:
+            // PC bloqueado: minijogo da senha.
+            game->dialogueIndex = scene.dialogueCount - 1;
+            SaveGame(game);
+            Senha_Iniciar();
+            game->senhaNoQuarto = false;
+            game->currentScreen = SCREEN_SENHA;
+            return;
+
+        case SCENE_ATO1_IA_A:
+            game->dialogueIndex = scene.dialogueCount - 1;
+            game->choice = ESCOLHA_ANO;
+            escolhaErro = 0.0f;
+            return;
+
+        case SCENE_ATO2_CORREDOR:
+            game->dialogueIndex = scene.dialogueCount - 1;
+            game->choice = ESCOLHA_AMIGO;
+            escolhaErro = 0.0f;
+            return;
+
+        case SCENE_ATO2_POSTER:
+            // Desafio 2: corrida de obstaculos.
+            game->dialogueIndex = scene.dialogueCount - 1;
+            SaveGame(game);
+            InitAto2Corrida();
+            game->currentScreen = SCREEN_CORRIDA;
+            return;
+
+        case SCENE_ATO2_LANHOUSE:
+            game->dialogueIndex = scene.dialogueCount - 1;
+            game->choice = ESCOLHA_IA;
+            escolhaErro = 0.0f;
+            return;
+
+        case SCENE_EPILOGUE:
+            // fim da historia: volta ao inicio (para jogar de novo)
+            // e mostra a tela final
+            ChangeScene(game, SCENE_PRESENT);
+            SaveGame(game);
+            game->currentScreen = SCREEN_ENDING;
+            return;
+
+        default:
+            break;
+    }
+
+    ChangeScene(game, scene.nextScene);
+
+    // viagem no tempo: flash ao chegar em 2007 ou ao voltar ao presente
+    if (game->currentScene == SCENE_2007 || game->currentScene == SCENE_EPILOGUE)
+        flashTimer = FLASH_DURACAO;
 }
 
 
@@ -332,6 +743,14 @@ void InitGame(GameState *game)
     game->dialogueIndex = 0;
 
     game->shouldExit = false;
+
+    game->choice = 0;
+
+    game->senhaNoQuarto = false;
+
+    Tokens_Reiniciar();
+    BarraTokens_Reiniciar();
+    Senha_ComecarJogo();
 }
 
 
@@ -363,6 +782,13 @@ static void ComecarNovoJogo(GameState *game)
 
     flashTimer = 0.0f;
 
+    game->choice = 0;
+    game->senhaNoQuarto = false;
+
+    Tokens_Reiniciar();                             // barra volta a 3
+    BarraTokens_Reiniciar();
+    Senha_ComecarJogo();
+
     SaveGame(game);                                 // zera o save
 }
 
@@ -390,10 +816,16 @@ void UpdateGame(GameState *game)
     AudioManager_Update();
     AtualizarMusica(game);
 
-    // Botao Volume abre as configuracoes nas telas jogaveis.
+    // Animacao da barra de tokens
+    BarraTokens_Atualizar();
+
+    // Botao de engrenagem abre as configuracoes nas telas jogaveis.
+    PosicionarEngrenagem(game);
+
     if ((game->currentScreen == SCREEN_GAME ||
          game->currentScreen == SCREEN_ROOM ||
-         game->currentScreen == SCREEN_MINIGAME) &&
+         game->currentScreen == SCREEN_SENHA ||
+         game->currentScreen == SCREEN_CORRIDA) &&
         IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
         CheckCollisionPointRec(GetMousePosition(), audioAbrir))
     {
@@ -472,6 +904,8 @@ void UpdateGame(GameState *game)
             }
 
             flashTimer = 0.0f;
+
+            game->choice = 0;
 
             game->currentScreen = SCREEN_GAME;
         }
@@ -558,25 +992,48 @@ void UpdateGame(GameState *game)
 
 
     // -------------------------------------------------
-    // MINIGAME
+    // SENHA (Ato 1)
     // -------------------------------------------------
 
-    if (game->currentScreen == SCREEN_MINIGAME)
+    if (game->currentScreen == SCREEN_SENHA)
     {
-        MinigameResult resultado = UpdateMinigame();
+        if (IsKeyPressed(KEY_ESCAPE))
+        {
+            SaveGame(game);
+            game->currentScreen = SCREEN_MENU;
+            return;
+        }
+
+        Senha_Atualizar();
+
+        if (Senha_Concluida())
+        {
+            game->currentScreen = SCREEN_GAME;
+            ChangeScene(game, SCENE_ATO1_IA_A);
+            SaveGame(game);
+        }
+
+        return;
+    }
+
+
+    // -------------------------------------------------
+    // CORRIDA DE OBSTACULOS (Ato 2)
+    // -------------------------------------------------
+
+    if (game->currentScreen == SCREEN_CORRIDA)
+    {
+        MinigameResult resultado = UpdateAto2Corrida();
 
         if (resultado == MINIGAME_MENU)             // ESC
         {
+            SaveGame(game);
             game->currentScreen = SCREEN_MENU;
         }
-        else if (resultado == MINIGAME_VENCEU)      // completou o desafio
+        else if (resultado == MINIGAME_VENCEU)      // chegou ao fim do corredor
         {
             game->currentScreen = SCREEN_GAME;
-
-            ChangeScene(game, SCENE_2007_WIN);
-
-            flashTimer = FLASH_DURACAO;
-
+            ChangeScene(game, SCENE_ATO2_LANHOUSE);
             SaveGame(game);
         }
 
@@ -599,9 +1056,9 @@ void UpdateGame(GameState *game)
         }
         else if (resultadoQuarto == ROOM_CONCLUIDO)
         {
-            // Fim da exploracao: inicia a conversa sobre o desafio
+            // Fim da exploracao: o PC esta bloqueado
             game->currentScreen = SCREEN_GAME;
-            ChangeScene(game, SCENE_2007_CHALLENGE);
+            ChangeScene(game, SCENE_2007_PC);
             SaveGame(game);
         }
 
@@ -625,6 +1082,14 @@ void UpdateGame(GameState *game)
             return;
         }
 
+        // Enquanto ha uma escolha na tela, so as opcoes respondem
+        if (game->choice != ESCOLHA_NENHUMA)
+        {
+            AtualizarEscolha(game);
+
+            return;
+        }
+
         Scene scene = GetScene(game->currentScene);
 
         if (IsKeyPressed(KEY_SPACE))
@@ -633,56 +1098,36 @@ void UpdateGame(GameState *game)
 
             if (game->dialogueIndex >= scene.dialogueCount)
             {
-                if (game->currentScene == SCENE_2007)
-                {
-                    // Fim dos dialogos iniciais: abre a exploracao do quarto.
-                    game->dialogueIndex = scene.dialogueCount - 1;
+                FimDaCena(game, scene);
 
-                    SaveGame(game);
-
-                    InitRoom();
-
-                    game->currentScreen = SCREEN_ROOM;
-
+                if (game->currentScreen != SCREEN_GAME || game->choice != ESCOLHA_NENHUMA)
                     return;
-                }
-
-                if (game->currentScene == SCENE_2007_CHALLENGE)
-                {
-                    // Fim dos dialogos do desafio: inicia o minigame.
-                    game->dialogueIndex = scene.dialogueCount - 1;
-
-                    SaveGame(game);
-
-                    InitMinigame();
-
-                    game->currentScreen = SCREEN_MINIGAME;
-
-                    return;
-                }
-
-                if (game->currentScene == SCENE_EPILOGUE)
-                {
-                    // fim da historia: volta ao inicio (para jogar de novo)
-                    // e mostra a tela final
-                    ChangeScene(game, SCENE_PRESENT);
-
-                    SaveGame(game);
-
-                    game->currentScreen = SCREEN_ENDING;
-
-                    return;
-                }
-
-                ChangeScene(game, scene.nextScene);
-
-                // viagem no tempo: flash ao chegar em 2007 ou ao voltar ao presente
-                if (game->currentScene == SCENE_2007 || game->currentScene == SCENE_EPILOGUE)
-                    flashTimer = FLASH_DURACAO;
             }
 
             SaveGame(game);                         // salva a cada fala
         }
+    }
+}
+
+
+// Desenha uma engrenagem (anel com 8 dentes) centrada em "centro"
+static void DesenharEngrenagem(Vector2 centro, float raio, Color cor)
+{
+    DrawRing(centro, raio * 0.35f, raio * 0.78f, 0.0f, 360.0f, 24, cor);
+
+    for (int i = 0; i < 8; i++)
+    {
+        float angulo = i * 45.0f;
+        float rad = angulo * DEG2RAD;
+
+        Rectangle dente = {
+            centro.x + cosf(rad) * raio * 0.70f,
+            centro.y + sinf(rad) * raio * 0.70f,
+            raio * 0.40f,
+            raio * 0.46f
+        };
+
+        DrawRectanglePro(dente, (Vector2){0.0f, dente.height / 2.0f}, angulo, cor);
     }
 }
 
@@ -692,13 +1137,27 @@ void DrawAudioButton(GameState *game)
 {
     if (game->currentScreen != SCREEN_GAME &&
         game->currentScreen != SCREEN_ROOM &&
-        game->currentScreen != SCREEN_MINIGAME)
+        game->currentScreen != SCREEN_SENHA &&
+        game->currentScreen != SCREEN_CORRIDA)
         return;
 
-    DrawRectangleRounded(audioAbrir, 0.25f, 8, (Color){25, 35, 65, 230});
-    DrawRectangleRoundedLines(audioAbrir, 0.25f, 8, SKYBLUE);
-    DrawText("♪ VOLUME", (int)audioAbrir.x + 20,
-             (int)audioAbrir.y + 12, 18, WHITE);
+    PosicionarEngrenagem(game);
+
+    // Engrenagem discreta: fica mais clara quando o mouse passa por cima
+    bool sobre = CheckCollisionPointRec(GetMousePosition(), audioAbrir);
+
+    DrawRectangleRounded(audioAbrir, 0.3f, 8,
+                         (Color){25, 35, 65, sobre ? 190 : 90});
+
+    Color cor = sobre ? (Color){255, 255, 255, 255}
+                      : (Color){255, 255, 255, 170};
+
+    DesenharEngrenagem(
+        (Vector2){audioAbrir.x + audioAbrir.width / 2.0f,
+                  audioAbrir.y + audioAbrir.height / 2.0f},
+        14.0f,
+        cor
+    );
 }
 
 
@@ -861,6 +1320,32 @@ void DrawGame(
 
 
     // -------------------------------------------------
+    // SENHA (Ato 1)
+    // -------------------------------------------------
+
+    if (game->currentScreen == SCREEN_SENHA)
+    {
+        Senha_Desenhar();
+
+        BarraTokens_Desenhar(990, 20);
+
+        return;
+    }
+
+
+    // -------------------------------------------------
+    // CORRIDA DE OBSTACULOS (Ato 2)
+    // -------------------------------------------------
+
+    if (game->currentScreen == SCREEN_CORRIDA)
+    {
+        DrawAto2Corrida();
+
+        return;
+    }
+
+
+    // -------------------------------------------------
     // EXPLORACAO DO QUARTO
     // -------------------------------------------------
 
@@ -872,112 +1357,130 @@ void DrawGame(
 
 
     // -------------------------------------------------
-    // MINIGAME
-    // -------------------------------------------------
-
-    if (game->currentScreen == SCREEN_MINIGAME)
-    {
-        DrawMinigame();
-
-        return;
-    }
-
-
-    // -------------------------------------------------
     // CENAS
     // -------------------------------------------------
 
     if (game->currentScreen == SCREEN_GAME)
     {
-        Texture2D background;
+        Scene scene = GetScene(game->currentScene);
 
-        switch (game->currentScene)
+        Dialogue dialogue = scene.dialogues[game->dialogueIndex];
+
+        VisualCena visual = VisualDaCena(game->currentScene);
+
+        // Fundo
+
+        switch (visual.fundo)
         {
-            case SCENE_PRESENT:
-                background = assets->bgPresent;
-                break;
-
-            case SCENE_2007:
-            case SCENE_2007_CHALLENGE:
-            case SCENE_2007_WIN:
-                background = assets->bg2007;
-                break;
-
-            default:
-                background = assets->bgPresent;
-                break;
+            case FUNDO_2026:          DesenharImagemTela(assets->bgPresent);     break;
+            case FUNDO_2007:          DesenharImagemTela(assets->bg2007);        break;
+            case FUNDO_CORREDOR:      DesenharImagemTela(assets->bgCorredor);    break;
+            case FUNDO_LANHOUSE:      DesenharLanHouse();                        break;
+            case FUNDO_CG_TELA:       DesenharImagemTela(assets->cgTela2026);    break;
+            case FUNDO_CG_ESCREVEM:   DesenharImagemTela(assets->cgEscrevem);    break;
+            case FUNDO_CG_PROFESSORA: DesenharImagemTela(assets->cgProfessora);  break;
+            case FUNDO_CG_ENSAIO:     DesenharImagemTela(assets->cgEnsaio);      break;
         }
 
-        // Background ocupando a tela toda
-
-        DrawTexturePro(
-            background,
-            (Rectangle){
-                0,
-                0,
-                background.width,
-                background.height
-            },
-            (Rectangle){
-                0,
-                0,
-                GetScreenWidth(),
-                GetScreenHeight()
-            },
-            (Vector2){0, 0},
-            0,
-            WHITE
-        );
-
-        // Personagem: Lia adulta no presente, Lia jovem em 2007
+        // Personagens: o amigo a esquerda, a Lia a direita
         // (altura, posicao Y do topo, borda direita)
 
-        if (
-            game->currentScene == SCENE_2007 ||
-            game->currentScene == SCENE_2007_CHALLENGE ||
-            game->currentScene == SCENE_2007_WIN
-        )
+        if (visual.amigo)
         {
-            DrawPersonagem(assets->liaJovemLado, 900.0f, -101.0f, 1250.0f);
+            Pose poseAmigo = PoseDe(&scene, game->dialogueIndex, "Amigo");
+
+            DrawPersonagem(
+                assets->amigo[poseAmigo == POSE_FELIZ ? 1 : 0],
+                900.0f, -101.0f, 610.0f
+            );
         }
-        else
+
+        if (visual.lia != 0)
         {
-            DrawPersonagem(assets->liaFrente, 820.0f, -7.0f, 1250.0f);
+            Pose poseLia = PoseDe(&scene, game->dialogueIndex, "Lia");
+
+            Texture2D texLia = TexturaLia(assets, visual.lia, poseLia);
+
+            if (visual.lia == 2007)
+                DrawPersonagem(texLia, 900.0f, -101.0f, 1250.0f);
+            else
+                DrawPersonagem(texLia, 820.0f, -7.0f, 1250.0f);
+        }
+
+        // Poster do concurso (Ato 2): aparece enquanto o amigo fala dele
+        if (game->currentScene == SCENE_ATO2_POSTER && game->dialogueIndex <= 1)
+        {
+            float altura = 400.0f;
+            float largura = altura * (float)assets->poster.width / (float)assets->poster.height;
+            Rectangle area = { (1280.0f - largura) / 2.0f, 60.0f, largura, altura };
+
+            float pulso = 0.5f + 0.5f * sinf((float)GetTime() * 4.0f);
+
+            DrawRectangleRounded(
+                (Rectangle){ area.x - 8, area.y - 8, area.width + 16, area.height + 16 },
+                0.04f, 8, Fade((Color){ 255, 105, 200, 255 }, 0.35f + 0.4f * pulso)
+            );
+
+            DrawTexturePro(
+                assets->poster,
+                (Rectangle){ 0, 0, (float)assets->poster.width, (float)assets->poster.height },
+                area, (Vector2){ 0, 0 }, 0.0f, WHITE
+            );
         }
 
         // ---------------------------------------------
         // DIÁLOGO
         // ---------------------------------------------
 
-        Scene scene = GetScene(game->currentScene);
-
-        Dialogue dialogue = scene.dialogues[game->dialogueIndex];
-
         DrawDialogueBox(
             dialogue.speaker,
             dialogue.text
         );
+
+        // imagens de cena (sem fala): dica para continuar
+        if (dialogue.text[0] == '\0' && dialogue.speaker[0] == '\0' && game->choice == ESCOLHA_NENHUMA)
+        {
+            DrawText("ESPAÇO  >>", 1040, 672, 22, Fade(WHITE, 0.85f));
+        }
 
         // ---------------------------------------------
         // AVISO: ESC VOLTA AO MENU
         // ---------------------------------------------
 
         DrawRectangleRounded(
-            (Rectangle){20, 20, 170, 36},
+            (Rectangle){66, 20, 170, 36},
             0.4f,
             8,
             Fade(BLACK, 0.55f)
         );
 
-        DrawText("ESC  MENU", 38, 29, 20, WHITE);
+        DrawText("ESC  MENU", 84, 29, 20, WHITE);
 
         // ---------------------------------------------
         // AVATAR DA IA (so quando a IA esta falando)
         // ---------------------------------------------
 
-        if (strcmp(dialogue.speaker, "IA") == 0)
+        if (strcmp(dialogue.speaker, "IA") == 0 && game->choice == ESCOLHA_NENHUMA)
         {
             DesenharAvatarIA(assets);
+        }
+
+        // ---------------------------------------------
+        // BARRA DE TOKENS (depois da senha, ate o epilogo)
+        // ---------------------------------------------
+
+        if (game->currentScene >= SCENE_ATO1_IA_A && game->currentScene < SCENE_EPILOGUE)
+        {
+            BarraTokens_Desenhar(990, 20);
+        }
+
+        // ---------------------------------------------
+        // ESCOLHA
+        // ---------------------------------------------
+
+        if (game->choice != ESCOLHA_NENHUMA)
+        {
+            DesenharEscolha(game);
         }
 
         // ---------------------------------------------

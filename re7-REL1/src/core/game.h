@@ -14,10 +14,12 @@ typedef enum
     SCREEN_MENU,
     SCREEN_GAME,
     SCREEN_CREDITS,
-    SCREEN_MINIGAME,
+    SCREEN_MINIGAME,        // minijogo antigo (nao usado mais pelo fluxo)
     SCREEN_ENDING,
     SCREEN_ROOM,
-    SCREEN_AUDIO
+    SCREEN_AUDIO,
+    SCREEN_SENHA,           // Ato 1: minijogo da senha
+    SCREEN_CORRIDA          // Ato 2: corrida de obstaculos
 } GameScreen;
 
 
@@ -33,6 +35,10 @@ typedef struct
     int dialogueIndex;
 
     GameScreen audioReturnScreen;
+
+    int choice;             // escolha na tela (0 = nenhuma); ver EscolhaId no game.c
+
+    bool senhaNoQuarto;     // true: a Lia voltou ao quarto depois de 5 erros na senha
 
     bool shouldExit;
 

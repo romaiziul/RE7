@@ -21,7 +21,7 @@
 // =====================================================
 
 
-#define TOTAL_PONTOS        3       // quantidade de objetos clicaveis
+#define TOTAL_PONTOS        4       // quantidade de objetos clicaveis
 #define FALAS_POR_PONTO     2       // maximo de falas de cada trecho
 #define RAIO_PONTO          38.0f   // tamanho da area clicavel (em pixels)
 #define NENHUM_PONTO        -1      // valor de "nenhum trecho aberto"
@@ -38,42 +38,49 @@ typedef struct
 } PontoQuarto;
 
 
-// Objetos do quarto (posicoes ajustadas para a imagem quarto_2007.png).
-// Se trocar a imagem ou o ponto nao ficar em cima do objeto, ajuste
-// posicaoX e posicaoY aqui (veja a tecla F1 no jogo).
+// Objetos do quarto, como no roteiro do Ato 1 (posicoes ajustadas para a imagem
+// ato1_quarto2007.png). Se trocar a imagem ou o ponto nao ficar em cima do objeto,
+// ajuste posicaoX e posicaoY aqui (veja a tecla F1 no jogo).
 static const PontoQuarto pontosDoQuarto[TOTAL_PONTOS] =
 {
-    // Poster: revela um interesse da protagonista e ambienta 2007
+    // Posteres de artistas
     {
-        "Poster",
-        2,
+        "Pôsteres",
+        1,
         {
-            { "Lia", "O poster do Chat Noir, o gato preto. Comprei na feira." },
-            { "Lia", "Em 2007 eu queria um quarto com cara de artista." }
+            { "Lia", "Nossa, meu gosto musical não mudou nada." }
         },
-        0.055f, 0.170f
+        0.248f, 0.170f
     },
 
-    // Diario na cama: revela um sentimento da protagonista
+    // Diario na mesa de cabeceira (a capa diz "07")
     {
-        "Diario",
-        2,
+        "Diário",
+        1,
         {
-            { "Lia", "Meu diario, esquecido em cima da cama." },
-            { "Lia", "\"Amanha eu apresento. E se eu travar na frente de todos?\"" }
+            { "Lia", "Eu costumava escrever nesse diário todos os dias quando era mais nova..." }
         },
-        0.200f, 0.570f
+        0.275f, 0.526f
     },
 
-    // PC: revela a vida digital da protagonista
+    // Calendario de 2007 na parede
+    {
+        "Calendário",
+        1,
+        {
+            { "Lia", "2007... parece que foi ontem." }
+        },
+        0.757f, 0.218f
+    },
+
+    // Computador de tubo
     {
         "Computador",
-        2,
+        1,
         {
-            { "Lia", "O MSN esta aberto e o Orkut esta na outra aba." },
-            { "Lia", "Passo horas aqui, mas hoje so penso no trabalho de amanha." }
+            { "Lia", "Meu primeiro computador pessoal! Travava mais do que tudo." }
         },
-        0.885f, 0.360f
+        0.837f, 0.425f
     }
 };
 
@@ -316,9 +323,9 @@ void DrawRoom(Assets *assets)
     // faixa de cima: instrucao
     DrawRectangle(0, 0, GetScreenWidth(), 64, Fade(BLACK, 0.6f));
 
-    DrawText("Explore o quarto (opcional)", 24, 12, 26, WHITE);
+    DrawText("Explore o quarto (opcional)", 70, 12, 26, WHITE);
 
-    DrawText("Clique nos objetos para ver mais. Quando quiser, clique em Continuar.", 24, 40, 18, SKYBLUE);
+    DrawText("Clique nos objetos para ver mais. Quando quiser, clique em Continuar.", 70, 40, 18, SKYBLUE);
 
     DrawText("ESC  MENU", GetScreenWidth() - 150, 22, 20, WHITE);
 
