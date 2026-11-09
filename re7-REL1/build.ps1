@@ -1,7 +1,10 @@
 Set-Location $PSScriptRoot
 
-# compila todos os .c que estiverem dentro de src (em qualquer subpasta)
-$fontes = Get-ChildItem src -Recurse -Filter *.c | ForEach-Object { $_.FullName }
+# escolha.c e um exemplo independente e tem a sua propria funcao main.
+$exemploEscolha = Join-Path $PSScriptRoot 'src\escolha.c'
+$fontes = Get-ChildItem src -Recurse -File -Filter *.c |
+    Where-Object { $_.FullName -ne $exemploEscolha } |
+    ForEach-Object { $_.FullName }
 
 # cada subpasta de src entra como pasta de #include (-I)
 $pastas = @("-Isrc")
@@ -10,7 +13,7 @@ Get-ChildItem src -Recurse -Directory | ForEach-Object {
     $pastas += "-I$relativo"
 }
 
-gcc @fontes -o re7.exe `
+& "C:\raylib\w64devkit\bin\gcc.exe" @fontes -o re7.exe `
     -IC:/raylib/raylib/src `
     @pastas `
     -LC:/raylib/raylib/src `

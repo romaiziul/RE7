@@ -32,7 +32,12 @@ typedef enum
     // ---- Epilogo (provisorio: o Ato 3 ainda nao foi feito) ----
     SCENE_EPILOGUE,
 
-    SCENE_COUNT
+    // Ato 3.
+    SCENE_ATO3_ABERTURA,
+    SCENE_ATO3_RESERVA,
+    SCENE_ATO3_OFERTA,
+
+    SCENE_COUNT 
 
 } SceneID;
 

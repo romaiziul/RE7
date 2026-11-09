@@ -198,23 +198,10 @@ RoomResult UpdateRoom(void)
             }
         }
 
-        // ESC fecha o trecho e volta a exploracao
-        if (IsKeyPressed(KEY_ESCAPE))
-        {
-            pontoAberto = NENHUM_PONTO;
-        }
-
         return ROOM_CONTINUA;
     }
 
     // ---------- exploracao livre ----------
-
-    if (IsKeyPressed(KEY_ESCAPE))
-    {
-        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-
-        return ROOM_MENU;
-    }
 
     int pontoSobMouse = PontoSobOMouse();
 
@@ -278,9 +265,9 @@ static void DesenharPonto(int indice, bool sobOMouse)
 
     // simbolo no meio
     const char *simbolo = pontoVisitado[indice] ? "OK" : "?";
-    int larguraSimbolo = MeasureText(simbolo, 28);
+    int larguraSimbolo = UiMeasureText(simbolo, 28);
 
-    DrawText(simbolo, (int)centro.x - larguraSimbolo / 2, (int)centro.y - 14, 28, WHITE);
+    UiDrawText(simbolo, (int)centro.x - larguraSimbolo / 2, (int)centro.y - 14, 28, WHITE);
 }
 
 void DrawRoom(Assets *assets)
@@ -310,24 +297,23 @@ void DrawRoom(Assets *assets)
     {
         Vector2 centro = CentroDoPonto(pontoSobMouse);
         const char *nome = pontosDoQuarto[pontoSobMouse].nome;
-        int larguraNome = MeasureText(nome, 22);
+        int larguraNome = UiMeasureText(nome, 22);
 
         DrawRectangleRounded(
             (Rectangle){ centro.x - larguraNome / 2.0f - 12.0f, centro.y - RAIO_PONTO - 48.0f, larguraNome + 24.0f, 34.0f },
             0.4f, 8, Fade(BLACK, 0.7f)
         );
 
-        DrawText(nome, (int)centro.x - larguraNome / 2, (int)(centro.y - RAIO_PONTO - 41.0f), 22, WHITE);
+        UiDrawText(nome, (int)centro.x - larguraNome / 2, (int)(centro.y - RAIO_PONTO - 41.0f), 22, WHITE);
     }
 
     // faixa de cima: instrucao
     DrawRectangle(0, 0, GetScreenWidth(), 64, Fade(BLACK, 0.6f));
 
-    DrawText("Explore o quarto (opcional)", 70, 12, 26, WHITE);
+    UiDrawText("Explore o quarto (opcional)", 70, 12, 26, WHITE);
 
-    DrawText("Clique nos objetos para ver mais. Quando quiser, clique em Continuar.", 70, 40, 18, SKYBLUE);
+    UiDrawText("Clique nos objetos para ver mais. Quando quiser, clique em Continuar.", 70, 40, 18, SKYBLUE);
 
-    DrawText("ESC  MENU", GetScreenWidth() - 150, 22, 20, WHITE);
 
     if (trechoAberto)
     {
@@ -346,9 +332,9 @@ void DrawRoom(Assets *assets)
         DrawRectangleRoundedLines(botao, 0.5f, 12, WHITE);
 
         const char *textoBotao = "Continuar";
-        int larguraTextoBotao = MeasureText(textoBotao, 28);
+        int larguraTextoBotao = UiMeasureText(textoBotao, 28);
 
-        DrawText(textoBotao, (int)(botao.x + (botao.width - larguraTextoBotao) / 2.0f), (int)(botao.y + 16.0f), 28, WHITE);
+        UiDrawText(textoBotao, (int)(botao.x + (botao.width - larguraTextoBotao) / 2.0f), (int)(botao.y + 16.0f), 28, WHITE);
     }
 
     // ajuda de desenvolvimento (F1): mostra onde o mouse esta em escala 0 a 1
@@ -356,7 +342,7 @@ void DrawRoom(Assets *assets)
     {
         Vector2 mouse = GetMousePosition();
 
-        DrawText(
+        UiDrawText(
             TextFormat("F1 ajuda | mouse: x=%.3f  y=%.3f", mouse.x / (float)GetScreenWidth(), mouse.y / (float)GetScreenHeight()),
             24, 76, 20, YELLOW
         );
