@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "ato3.h"
 
 
 // =====================================================
@@ -57,27 +58,23 @@ static void DesenharFundo(void)
 
 
 // =====================================================
-// SAVE / LOAD (arquivo de texto: "cena fala")
+// SAVE / LOAD (arquivo de texto: "cena fala tokens reserva")
 // =====================================================
 
 #define SAVE_FILE "save.dat"
 
-static void SaveGame(GameState *game)
+static bool SaveGame(GameState *game)
 {
-    SaveFileText(
+    return SaveFileText(
         SAVE_FILE,
-        (char *)TextFormat("%d %d %d", (int)game->currentScene, game->dialogueIndex, Tokens_Valor())
+        (char *)TextFormat(
+            "%d %d %d %d",
+            (int)game->currentScene,
+            game->dialogueIndex,
+            Tokens_Valor(),
+            Tokens_ReservaUsada() ? 1 : 0
+        )
     );
-}
-
-// Poe a barra de tokens no valor pedido (0 a 3)
-static void DefinirTokens(int valor)
-{
-    Tokens_Reiniciar();
-
-    for (int i = TOKENS_MAX; i > valor; i--) Tokens_Gastar();
-
-    BarraTokens_Reiniciar();
 }
 
 // Retorna true se conseguiu carregar um save valido
@@ -93,12 +90,13 @@ static bool LoadGame(GameState *game)
     int index = 0;
     int tokens = TOKENS_MAX;
 
-    int lidos = sscanf(text, "%d %d %d", &scene, &index, &tokens);
+    int reserva = 0;
+    int lidos = sscanf(text, "%d %d %d %d", &scene, &index, &tokens, &reserva);
 
     UnloadFileText(text);
 
-    // saves antigos (so cena e fala) sao ignorados
-    if (lidos != 3) return false;
+    // O save anterior tem tres campos e ainda pode ser carregado.
+    if (lidos != 3 && lidos != 4) return false;
 
     if (scene < 0 || scene >= SCENE_COUNT) return false;
 
@@ -112,7 +110,8 @@ static bool LoadGame(GameState *game)
     game->dialogueIndex = index;
     game->choice = 0;
 
-    DefinirTokens(tokens);
+    Tokens_Restaurar(tokens, reserva == 1);
+    BarraTokens_Reiniciar();
 
     return true;
 }
@@ -381,15 +380,7 @@ static float avisoInvalido = 0.0f;
 
 // Controles do painel de audio
 static Rectangle audioFechar = {1040, 80, 100, 45};
-static Rectangle audioAbrir = {14, 14, 40, 40};
 
-// Posicao da engrenagem: canto superior esquerdo (na tela da senha, canto inferior,
-// porque o cabecalho da senha ocupa o topo)
-static void PosicionarEngrenagem(GameState *game)
-{
-    audioAbrir.x = 14.0f;
-    audioAbrir.y = (game->currentScreen == SCREEN_SENHA) ? 666.0f : 14.0f;
-}
 static Rectangle audioTestar = {470, 430, 220, 55};
 static Rectangle audioMudo = {470, 500, 220, 55};
 static Rectangle sliderMusica = {400, 270, 400, 12};
@@ -401,7 +392,7 @@ static float avisoSom = 0.0f;
 // Desenha um controle deslizante de volume
 static void DesenharSlider(Rectangle r, float valor, const char *titulo)
 {
-    DrawText(titulo, (int)r.x, (int)r.y - 32, 22, WHITE);
+    UiDrawText(titulo, (int)r.x, (int)r.y - 32, 22, WHITE);
 
     DrawRectangleRec(r, GRAY);
 
@@ -427,7 +418,7 @@ static void DesenharAvisoSom(void)
 
     const char *texto = mutado ? "Som desligado (F2)" : "Som ligado";
 
-    int larguraTexto = MeasureText(texto, 18);
+    int larguraTexto = UiMeasureText(texto, 18);
 
     Rectangle caixa = {
         (float)GetScreenWidth() - larguraTexto - 44.0f,
@@ -438,7 +429,7 @@ static void DesenharAvisoSom(void)
 
     DrawRectangleRounded(caixa, 0.4f, 8, Fade(BLACK, 0.65f));
 
-    DrawText(
+    UiDrawText(
         texto,
         (int)caixa.x + 14,
         (int)caixa.y + 6,
@@ -826,7 +817,7 @@ static void DesenharPopupMSN(void)
     DrawRectangleRoundedLines(janela, 0.04f, 8, (Color){ 29, 38, 96, 255 });
 
     DrawCircle((int)janela.x + 26, (int)janela.y + 22, 8, (Color){ 76, 175, 80, 255 });
-    DrawText("IA diz:", (int)janela.x + 44, (int)janela.y + 11, 22, WHITE);
+    UiDrawText("IA diz:", (int)janela.x + 44, (int)janela.y + 11, 22, WHITE);
 }
 
 static void DesenharEscolha(GameState *game)
@@ -839,7 +830,7 @@ static void DesenharEscolha(GameState *game)
     if (game->choice == ESCOLHA_IA)
     {
         DesenharPopupMSN();
-        DrawText(e->pergunta, 340, 175, 28, (Color){ 29, 38, 96, 255 });
+        UiDrawText(e->pergunta, 340, 175, 28, (Color){ 29, 38, 96, 255 });
     }
     else
     {
@@ -861,9 +852,9 @@ static void DesenharEscolha(GameState *game)
         DrawRectangleRoundedLines(r, 0.3f, 8, WHITE);
 
         const char *texto = TextFormat("%d   %s", i + 1, e->opcoes[i]);
-        int larguraTexto = MeasureText(texto, 26);
+        int larguraTexto = UiMeasureText(texto, 26);
 
-        DrawText(texto, (int)(r.x + (r.width - larguraTexto) / 2.0f), (int)r.y + 20, 26, WHITE);
+        UiDrawText(texto, (int)(r.x + (r.width - larguraTexto) / 2.0f), (int)r.y + 20, 26, WHITE);
     }
 }
 
@@ -1147,6 +1138,115 @@ static void ComecarNovoJogo(GameState *game)
 // UPDATE
 // =====================================================
 
+typedef enum
+{
+    PAUSA_VOLTAR,
+    PAUSA_AUDIO,
+    PAUSA_SALVAR,
+    PAUSA_SAIR
+} AcaoPausa;
+
+static const struct
+{
+    Rectangle area;
+    const char *rotulo;
+} opcoesPausa[] =
+{
+    [PAUSA_VOLTAR] = {{430, 246, 420, 52}, "Voltar ao menu"},
+    [PAUSA_AUDIO]  = {{430, 318, 420, 52}, "Áudio"},
+    [PAUSA_SALVAR] = {{430, 390, 420, 52}, "Salvar Progresso"},
+    [PAUSA_SAIR]   = {{430, 462, 420, 52}, "Sair do Jogo"}
+};
+
+static const Rectangle fecharPausa = {838, 135, 36, 36};
+static const Rectangle cancelarRetorno = {390, 387, 230, 52};
+static const Rectangle confirmarRetorno = {660, 387, 230, 52};
+static const char *mensagemPausa = NULL;
+
+static bool PodePausar(GameScreen tela)
+{
+    return tela == SCREEN_GAME || tela == SCREEN_ROOM ||
+           tela == SCREEN_SENHA || tela == SCREEN_CORRIDA;
+}
+
+static Rectangle AreaBotaoMenu(GameScreen tela)
+{
+    const float largura = 104.0f;
+    const float margem = 14.0f;
+
+    if (tela == SCREEN_ROOM)
+        return (Rectangle){GetScreenWidth() - largura - margem, margem, largura, 40};
+
+    // Na senha, o cabecalho ocupa a parte de cima da tela.
+    float y = (tela == SCREEN_SENHA) ? 666.0f : margem;
+    return (Rectangle){margem, y, largura, 40};
+}
+
+static void AbrirPausa(GameState *game)
+{
+    game->pauseReturnScreen = game->currentScreen;
+    game->currentScreen = SCREEN_PAUSE;
+    mensagemPausa = NULL;
+    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+}
+
+static void AtualizarMenuPausa(GameState *game)
+{
+    if (game->currentScreen == SCREEN_CONFIRM_MENU)
+    {
+        if (IsButtonClicked(cancelarRetorno))
+        {
+            AudioManager_Play(SOM_MOUSE);
+            mensagemPausa = NULL;
+            game->currentScreen = SCREEN_PAUSE;
+        }
+        else if (IsButtonClicked(confirmarRetorno))
+        {
+            AudioManager_Play(SOM_MOUSE);
+            if (SaveGame(game))
+                game->currentScreen = SCREEN_MENU;
+            else
+                mensagemPausa = "Não foi possível salvar. Tente novamente.";
+        }
+
+        return;
+    }
+
+    if (IsButtonClicked(fecharPausa))
+    {
+        AudioManager_Play(SOM_MOUSE);
+        game->currentScreen = game->pauseReturnScreen;
+        return;
+    }
+
+    for (int i = 0; i < (int)(sizeof(opcoesPausa) / sizeof(opcoesPausa[0])); i++)
+    {
+        if (!IsButtonClicked(opcoesPausa[i].area)) continue;
+
+        AudioManager_Play(SOM_MOUSE);
+        switch (i)
+        {
+            case PAUSA_VOLTAR:
+                mensagemPausa = NULL;
+                game->currentScreen = SCREEN_CONFIRM_MENU;
+                break;
+            case PAUSA_AUDIO:
+                game->currentScreen = SCREEN_AUDIO;
+                break;
+            case PAUSA_SALVAR:
+                mensagemPausa = SaveGame(game)
+                    ? "Progresso salvo."
+                    : "Não foi possível salvar. Tente novamente.";
+                break;
+            case PAUSA_SAIR:
+                game->shouldExit = true;
+                break;
+        }
+
+        return;
+    }
+}
+
 void UpdateGame(GameState *game)
 {
     // o flash de viagem no tempo vai se apagando
@@ -1169,19 +1269,18 @@ void UpdateGame(GameState *game)
     // Animacao da barra de tokens
     BarraTokens_Atualizar();
 
-    // Botao de engrenagem abre as configuracoes nas telas jogaveis.
-    PosicionarEngrenagem(game);
-
-    if ((game->currentScreen == SCREEN_GAME ||
-         game->currentScreen == SCREEN_ROOM ||
-         game->currentScreen == SCREEN_SENHA ||
-         game->currentScreen == SCREEN_CORRIDA) &&
-        IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-        CheckCollisionPointRec(GetMousePosition(), audioAbrir))
+    if (PodePausar(game->currentScreen) &&
+        IsButtonClicked(AreaBotaoMenu(game->currentScreen)))
     {
-        game->audioReturnScreen = game->currentScreen;
-        game->currentScreen = SCREEN_AUDIO;
         AudioManager_Play(SOM_MOUSE);
+        AbrirPausa(game);
+        return;
+    }
+
+    if (game->currentScreen == SCREEN_PAUSE ||
+        game->currentScreen == SCREEN_CONFIRM_MENU)
+    {
+        AtualizarMenuPausa(game);
         return;
     }
 
@@ -1190,11 +1289,9 @@ void UpdateGame(GameState *game)
     {
         Vector2 mouse = GetMousePosition();
 
-        if (IsKeyPressed(KEY_ESCAPE) ||
-            (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-             CheckCollisionPointRec(mouse, audioFechar)))
+        if (IsButtonClicked(audioFechar))
         {
-            game->currentScreen = game->audioReturnScreen;
+            game->currentScreen = SCREEN_PAUSE;
             return;
         }
 
@@ -1347,13 +1444,6 @@ void UpdateGame(GameState *game)
 
     if (game->currentScreen == SCREEN_SENHA)
     {
-        if (IsKeyPressed(KEY_ESCAPE))
-        {
-            SaveGame(game);
-            game->currentScreen = SCREEN_MENU;
-            return;
-        }
-
         Senha_Atualizar();
 
         if (Senha_Concluida())
@@ -1375,12 +1465,7 @@ void UpdateGame(GameState *game)
     {
         MinigameResult resultado = UpdateAto2Corrida();
 
-        if (resultado == MINIGAME_MENU)             // ESC
-        {
-            SaveGame(game);
-            game->currentScreen = SCREEN_MENU;
-        }
-        else if (resultado == MINIGAME_VENCEU)      // chegou ao fim do corredor
+        if (resultado == MINIGAME_VENCEU)      // chegou ao fim do corredor
         {
             game->currentScreen = SCREEN_GAME;
             ChangeScene(game, SCENE_ATO2_ENCONTRO);
@@ -1401,12 +1486,7 @@ void UpdateGame(GameState *game)
     {
         RoomResult resultadoQuarto = UpdateRoom();
 
-        if (resultadoQuarto == ROOM_MENU)  // ESC
-        {
-            SaveGame(game);
-            game->currentScreen = SCREEN_MENU;
-        }
-        else if (resultadoQuarto == ROOM_CONCLUIDO)
+        if (resultadoQuarto == ROOM_CONCLUIDO)
         {
             // Fim da exploracao: o PC esta bloqueado
             game->currentScreen = SCREEN_GAME;
@@ -1513,7 +1593,8 @@ void UpdateGame(GameState *game)
 
         Scene scene = GetScene(game->currentScene);
 
-        if (IsKeyPressed(KEY_SPACE))
+       if (IsKeyPressed(KEY_SPACE) ||
+    IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
             game->dialogueIndex++;
 
@@ -1531,56 +1612,64 @@ void UpdateGame(GameState *game)
 }
 
 
-// Desenha uma engrenagem (anel com 8 dentes) centrada em "centro"
-static void DesenharEngrenagem(Vector2 centro, float raio, Color cor)
+static void DesenharBotaoPausa(Rectangle area, const char *texto, int tamanho)
 {
-    DrawRing(centro, raio * 0.35f, raio * 0.78f, 0.0f, 360.0f, 24, cor);
+    bool sobre = CheckCollisionPointRec(GetMousePosition(), area);
+    Color fundo = sobre ? (Color){113, 46, 110, 255} : (Color){31, 39, 77, 255};
+    Color borda = sobre ? (Color){255, 105, 200, 255} : Fade(SKYBLUE, 0.5f);
 
-    for (int i = 0; i < 8; i++)
-    {
-        float angulo = i * 45.0f;
-        float rad = angulo * DEG2RAD;
+    DrawRectangleRounded(area, 0.28f, 8, fundo);
+    DrawRectangleRoundedLines(area, 0.28f, 8, borda);
 
-        Rectangle dente = {
-            centro.x + cosf(rad) * raio * 0.70f,
-            centro.y + sinf(rad) * raio * 0.70f,
-            raio * 0.40f,
-            raio * 0.46f
-        };
-
-        DrawRectanglePro(dente, (Vector2){0.0f, dente.height / 2.0f}, angulo, cor);
-    }
+    int x = (int)(area.x + (area.width - UiMeasureTextEmphasis(texto, tamanho)) / 2.0f);
+    int y = (int)(area.y + (area.height - tamanho) / 2.0f);
+    UiDrawTextEmphasis(texto, x, y, tamanho, WHITE);
 }
 
-
-// Botao de acesso ao painel de audio, desenhado por cima da tela atual.
-void DrawAudioButton(GameState *game)
+void DrawPauseControls(GameState *game)
 {
-    if (game->currentScreen != SCREEN_GAME &&
-        game->currentScreen != SCREEN_ROOM &&
-        game->currentScreen != SCREEN_SENHA &&
-        game->currentScreen != SCREEN_CORRIDA)
-        return;
-
-    PosicionarEngrenagem(game);
-
-    // Engrenagem discreta: fica mais clara quando o mouse passa por cima
-    bool sobre = CheckCollisionPointRec(GetMousePosition(), audioAbrir);
-
-    DrawRectangleRounded(audioAbrir, 0.3f, 8,
-                         (Color){25, 35, 65, sobre ? 190 : 90});
-
-    Color cor = sobre ? (Color){255, 255, 255, 255}
-                      : (Color){255, 255, 255, 170};
-
-    DesenharEngrenagem(
-        (Vector2){audioAbrir.x + audioAbrir.width / 2.0f,
-                  audioAbrir.y + audioAbrir.height / 2.0f},
-        14.0f,
-        cor
-    );
+    if (PodePausar(game->currentScreen))
+        DesenharBotaoPausa(AreaBotaoMenu(game->currentScreen), "Menu", 20);
 }
 
+static void DesenharMenuPausa(void)
+{
+    DesenharFundo();
+
+    Rectangle painel = {382, 112, 516, 510};
+    DrawRectangleRounded(painel, 0.06f, 12, (Color){18, 20, 45, 245});
+    DrawRectangleRoundedLines(painel, 0.06f, 12, Fade(SKYBLUE, 0.55f));
+
+    DrawCenteredText("Jogo pausado", 153, 42, WHITE);
+    DrawLine(430, 223, 850, 223, Fade(SKYBLUE, 0.35f));
+    DesenharBotaoPausa(fecharPausa, "X", 18);
+
+    for (int i = 0; i < (int)(sizeof(opcoesPausa) / sizeof(opcoesPausa[0])); i++)
+        DesenharBotaoPausa(opcoesPausa[i].area, opcoesPausa[i].rotulo, 24);
+
+    if (mensagemPausa)
+        DrawCenteredText(mensagemPausa, 537, 19, SKYBLUE);
+
+    DrawCenteredText("Clique no X para retomar a partida", 583, 18, Fade(WHITE, 0.7f));
+}
+
+static void DesenharConfirmacaoMenu(void)
+{
+    DesenharFundo();
+
+    Rectangle painel = {314, 221, 652, 275};
+    DrawRectangleRounded(painel, 0.10f, 12, (Color){18, 20, 45, 245});
+    DrawRectangleRoundedLines(painel, 0.10f, 12, Fade(SKYBLUE, 0.55f));
+
+    DrawCenteredText("Voltar ao menu principal?", 260, 34, WHITE);
+    DrawCenteredText("Seu progresso será salvo antes de voltar.", 326, 22, SKYBLUE);
+
+    DesenharBotaoPausa(cancelarRetorno, "Cancelar", 22);
+    DesenharBotaoPausa(confirmarRetorno, "Confirmar", 22);
+
+    if (mensagemPausa)
+        DrawCenteredText(mensagemPausa, 454, 18, PINK);
+}
 
 // =====================================================
 // DESENHAR JOGO
@@ -1592,6 +1681,18 @@ void DrawGame(
 )
 {
 
+    if (game->currentScreen == SCREEN_PAUSE)
+    {
+        DesenharMenuPausa();
+        return;
+    }
+
+    if (game->currentScreen == SCREEN_CONFIRM_MENU)
+    {
+        DesenharConfirmacaoMenu();
+        return;
+    }
+
     // Painel de configuracoes de audio
     if (game->currentScreen == SCREEN_AUDIO)
     {
@@ -1601,7 +1702,7 @@ void DrawGame(
             (Color){15, 15, 35, 245}
         );
 
-        DrawText("CONFIGURACOES DE AUDIO",
+        UiDrawText("CONFIGURACOES DE AUDIO",
                  350, 100, 32, WHITE);
 
         DesenharSlider(
@@ -1617,10 +1718,10 @@ void DrawGame(
         );
 
         DrawRectangleRec(audioTestar, DARKBLUE);
-        DrawText("TESTAR EFEITO", 500, 447, 20, WHITE);
+        UiDrawText("TESTAR EFEITO", 500, 447, 20, WHITE);
 
         DrawRectangleRec(audioMudo, DARKPURPLE);
-        DrawText(
+        UiDrawText(
             AudioManager_IsMusicMuted()
                 ? "REATIVAR MUSICA"
                 : "SILENCIAR MUSICA",
@@ -1628,7 +1729,7 @@ void DrawGame(
         );
 
         DrawRectangleRec(audioFechar, MAROON);
-        DrawText("FECHAR", 1055, 93, 18, WHITE);
+        UiDrawText("VOLTAR", 1055, 93, 18, WHITE);
 
         return;
     }
@@ -1787,6 +1888,35 @@ void DrawGame(
 
         Dialogue dialogue = scene.dialogues[game->dialogueIndex];
 
+        if (game->currentScene == SCENE_ATO3_ABERTURA ||
+            game->currentScene == SCENE_ATO3_RESERVA ||
+            game->currentScene == SCENE_ATO3_OFERTA)
+        {
+            Ato3_DesenharCenario();
+
+            Color telaPC = Tokens_IAOffline()
+                ? (Color){25, 28, 35, 255}
+                : (Color){74, 190, 135, 255};
+            DrawRectangle(684, 293, 42, 28, telaPC);
+
+            if (game->currentScene != SCENE_ATO3_ABERTURA ||
+                game->dialogueIndex >= 1)
+            {
+                Ato3_DesenharPapel();
+            }
+
+            DrawDialogueBox(dialogue.speaker, dialogue.text);
+            BarraTokens_Desenhar(990, 20);
+
+            UiDrawText(
+                "CLIQUE ou ESPACO para continuar",
+                760, 690, 18, Fade(WHITE, 0.8f)
+            );
+
+            DesenharAvisoSom();
+            return;
+        }
+
         VisualCena visual = VisualDaCena(game->currentScene);
 
         // Fundo
@@ -1872,21 +2002,8 @@ void DrawGame(
         // imagens de cena (sem fala): dica para continuar
         if (dialogue.text[0] == '\0' && dialogue.speaker[0] == '\0' && game->choice == ESCOLHA_NENHUMA)
         {
-            DrawText("ESPAÇO  >>", 1040, 672, 22, Fade(WHITE, 0.85f));
+           UiDrawText("CLIQUE ou ESPACO  >>", 900, 672, 22, Fade(WHITE, 0.85f));
         }
-
-        // ---------------------------------------------
-        // AVISO: ESC VOLTA AO MENU
-        // ---------------------------------------------
-
-        DrawRectangleRounded(
-            (Rectangle){66, 20, 170, 36},
-            0.4f,
-            8,
-            Fade(BLACK, 0.55f)
-        );
-
-        DrawText("ESC  MENU", 84, 29, 20, WHITE);
 
         // ---------------------------------------------
         // AVATAR DA IA (so quando a IA esta falando)

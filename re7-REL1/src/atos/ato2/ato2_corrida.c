@@ -1,7 +1,7 @@
 /*
  * Ato 2 - Desafio 2: corrida de obstaculos no corredor da escola.
  *
- * Controles: ESPACO, W ou seta para cima para pular. ESC volta ao menu.
+ * Controles: ESPACO, W ou seta para cima para pular. Clique em Menu para pausar.
  *
  * Regras:
  *   - O corredor passa por baixo da Lia durante DURACAO_SEGUNDOS.
@@ -233,8 +233,6 @@ MinigameResult UpdateAto2Corrida(void)
 {
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
-
-    if (IsKeyPressed(KEY_ESCAPE)) return MINIGAME_MENU;
 
     /* fim: escurece e devolve a vitoria */
     if (terminando) {
