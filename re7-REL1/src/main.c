@@ -3,6 +3,7 @@
 #include "game.h"
 #include "assets.h"
 #include "audio_manager.h"
+#include "ui.h"
 
 int main(void)
 {
@@ -15,11 +16,12 @@ int main(void)
         "Re_7"
     );
 
+    UiLoadFonts();
     AudioManager_Init();
 
     SetTargetFPS(60);
 
-    // ESC nao fecha mais o jogo (ele volta ao menu)
+    // ESC e tratado pelas telas do jogo.
     SetExitKey(KEY_NULL);
 
     Assets assets;
@@ -40,7 +42,7 @@ int main(void)
         ClearBackground(BLACK);
 
         DrawGame(&game, &assets);
-        DrawAudioButton(&game);
+        DrawPauseControls(&game);
 
         EndDrawing();
     }
@@ -50,6 +52,7 @@ int main(void)
 
     AudioManager_Close();
 
+    UiUnloadFonts();
     CloseWindow();
 
     return 0;

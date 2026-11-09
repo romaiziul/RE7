@@ -19,7 +19,9 @@ typedef enum
     SCREEN_ROOM,
     SCREEN_AUDIO,
     SCREEN_SENHA,           // Ato 1: minijogo da senha
-    SCREEN_CORRIDA          // Ato 2: corrida de obstaculos
+    SCREEN_CORRIDA,         // Ato 2: corrida de obstaculos
+    SCREEN_PAUSE,
+    SCREEN_CONFIRM_MENU
 } GameScreen;
 
 
@@ -34,7 +36,7 @@ typedef struct
 
     int dialogueIndex;
 
-    GameScreen audioReturnScreen;
+    GameScreen pauseReturnScreen;
 
     int choice;             // escolha na tela (0 = nenhuma); ver EscolhaId no game.c
 
@@ -51,7 +53,7 @@ void InitGame(GameState *game);
 
 void UpdateGame(GameState *game);
 
-void DrawAudioButton(GameState *game);
+void DrawPauseControls(GameState *game);
 
 void DrawGame(
     GameState *game,

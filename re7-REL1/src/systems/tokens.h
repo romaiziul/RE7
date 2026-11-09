@@ -21,4 +21,6 @@ bool Tokens_IAOffline(void);   // true quando chega a 0
 bool Tokens_UsarReserva(void);
 bool Tokens_ReservaUsada(void);  // true depois que a reserva entrou (a barra mostra esse token em vermelho)
 
+void Tokens_Restaurar(int valor, bool reservaFoiUsada);
+
 #endif

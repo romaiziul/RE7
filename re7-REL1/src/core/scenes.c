@@ -2,6 +2,7 @@
 #include "story.h"
 #include "story_ato1.h"
 #include "story_ato2.h"
+#include "story_ato3.h"
 
 
 // =====================================================
@@ -81,8 +82,8 @@ Scene GetScene(SceneID id)
         case SCENE_ATO2_CG_FRENTE_ESCOLA:
             return (Scene){ ato2CgFrenteEscolaDialogues, GetAto2CgFrenteEscolaCount(), SCENE_ATO2_CG_PROFESSORA };
 
-        case SCENE_ATO2_CG_PROFESSORA:
-            return (Scene){ ato2CgProfessoraDialogues, GetAto2CgProfessoraCount(), SCENE_EPILOGUE };
+        case SCENE_ATO2_CG_PROFESSORA: 
+        return (Scene){ ato2CgProfessoraDialogues, GetAto2CgProfessoraCount(), SCENE_ATO3_ABERTURA };
 
         case SCENE_ATO2_C4_ZERO:
             return (Scene){ ato2C4ZeroDialogues, GetAto2C4ZeroCount(), SCENE_ATO2_CG_ENSAIO };

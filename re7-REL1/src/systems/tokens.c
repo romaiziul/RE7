@@ -38,3 +38,12 @@ bool Tokens_UsarReserva(void)
 }
 
 bool Tokens_ReservaUsada(void) { return reservaUsada; }
+
+void Tokens_Restaurar(int valor, bool reservaFoiUsada)
+{
+    if (valor < 0) valor = 0;
+    if (valor > TOKENS_MAX) valor = TOKENS_MAX;
+
+    tokens = valor;
+    reservaUsada = reservaFoiUsada;
+}
