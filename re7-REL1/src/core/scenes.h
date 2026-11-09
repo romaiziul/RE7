@@ -63,7 +63,10 @@ typedef enum
     POSE_RINDO,
     POSE_PREOCUPADA,
     POSE_DECIDIDA,
-    POSE_FELIZ
+    POSE_FELIZ,
+    POSE_TRISTE,        // so a Lia 2007
+    POSE_PENSATIVA,     // so a Lia 2007
+    POSE_DETERMINADA    // so a Lia 2007
 
 } Pose;
 

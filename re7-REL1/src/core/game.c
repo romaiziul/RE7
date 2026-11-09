@@ -128,13 +128,15 @@ typedef enum
 {
     FADE_NENHUM,
     FADE_ESCURECENDO,       // a tela vai ficando preta; no fim troca de cena
+    FADE_SEGURANDO,         // tela preta com um texto (ex.: "No outro dia...")
     FADE_CLAREANDO          // a tela volta a aparecer
 } FadeFase;
 
 #define FADE_SAIDA_ENCONTRO     1.8f    // escurece depois da fala "Ufa, consegui alcançá-lo!"
 #define FADE_TRANSICAO          1.2f    // escurece entre uma cena e outra do Ato 2
-#define FADE_ENTRADA_LANHOUSE   1.4f    // a nova cena clareia
-#define FADE_ENTRADA_ENCONTRO   0.5f    // o encontro aparece depois da corrida
+#define FADE_ENTRADA_LANHOUSE   1.27f    // a nova cena clareia
+#define FADE_ENTRADA_ENCONTRO   0.45f   // o encontro aparece depois da corrida
+#define FADE_TEXTO_SEGUNDOS     3.0f    // quanto tempo o texto fica na tela preta
 #define ENCONTRO_VIRA_SEGUNDOS  1.1f    // quanto tempo o amigo demora para virar e olhar para a Lia
 
 static FadeFase fadeFase = FADE_NENHUM;
@@ -151,6 +153,19 @@ static void IniciarFade(FadeFase fase, float duracao, SceneID destino)
     fadeDestino = destino;
 }
 
+// Texto mostrado na tela preta antes de entrar numa cena (NULL = nenhum)
+static const char *TextoDeTransicao(SceneID destino)
+{
+    if (destino == SCENE_ATO2_CG_FRENTE_ESCOLA) return "No outro dia...";
+    return NULL;
+}
+
+// Cenas que seguram a tela preta antes de aparecer (com ou sem texto)
+static bool SegurarPretoAntes(SceneID destino)
+{
+    return destino == SCENE_ATO2_CG_FRENTE_ESCOLA;
+}
+
 static void DesenharFade(void)
 {
     if (fadeFase == FADE_NENHUM) return;
@@ -158,9 +173,203 @@ static void DesenharFade(void)
     float t = fadeTempo / fadeDuracao;
     if (t > 1.0f) t = 1.0f;
 
-    float alfa = (fadeFase == FADE_ESCURECENDO) ? t : 1.0f - t;
+    float alfa = 1.0f;
+    if (fadeFase == FADE_ESCURECENDO) alfa = t;
+    else if (fadeFase == FADE_CLAREANDO) alfa = 1.0f - t;
 
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alfa));
+
+    // o texto entra e sai com o mesmo fade da tela
+    const char *texto = TextoDeTransicao(fadeDestino);
+    if (texto != NULL)
+    {
+        int tamanho = 44;
+        int largura = MeasureText(texto, tamanho);
+        DrawText(texto, (GetScreenWidth() - largura) / 2, GetScreenHeight() / 2 - tamanho / 2,
+                 tamanho, Fade(WHITE, alfa));
+    }
+}
+
+// =====================================================
+// SEQUENCIA DO COMPUTADOR (fim do Ato 1 -> Ato 2)
+// Boot do "Doors XP" -> area de trabalho -> o mouse clica no navegador
+// "Orquidea" -> pagina da rede social, com o mouse acompanhando a leitura.
+// Tudo desenhado em codigo (o cursor tambem). Posicoes em fracao da tela (0 a 1).
+// =====================================================
+
+static bool  pcAtivo = false;
+static float pcTempo = 0.0f;
+static float pcSaida = -1.0f;      // < 0: ainda na sequencia; >= 0: escurecendo para sair
+
+#define PC_BOOT_ENTRA        0.7f     // a tela de boot aparece saindo do preto
+#define PC_BOOT_FIM          4.7f     // fim do boot
+#define PC_DESK_FADE         0.6f     // boot -> area de trabalho
+#define PC_CLIQUE_1          7.9f     // duplo clique no icone
+#define PC_CLIQUE_2          8.2f
+#define PC_PERFIL_INICIO     8.5f     // area de trabalho -> pagina da rede social
+#define PC_PERFIL_FADE       0.4f
+#define PC_ESPERA           12.0f     // o mouse terminou o titulo; a pagina fica ate o jogador apertar ESPACO
+#define PC_SAIDA             1.0f     // fade para preto no fim
+
+// Icone do navegador "Windows Explosion" na area de trabalho (retangulo do icone + legenda)
+static const Rectangle PC_ICONE = { 0.015f, 0.180f, 0.092f, 0.198f };
+// Trilho da barra de carregamento do boot (parte de dentro)
+static const Rectangle PC_TRILHO = { 0.386f, 0.7545f, 0.228f, 0.0148f };
+
+typedef struct { float t; float x; float y; bool suave; } PcPonto;
+
+// Caminho do mouse (tempo em segundos desde o inicio da sequencia)
+static const PcPonto pcCaminho[] =
+{
+    {  5.3f, 0.82f, 0.60f, false },   // aparece
+    {  7.3f, 0.058f, 0.250f, true },  // vai ate o icone
+    {  8.9f, 0.058f, 0.250f, false }, // clica duas vezes e espera a pagina abrir
+    { 10.2f, 0.250f, 0.100f, true },  // vai ate o titulo da comunidade
+    { 11.6f, 0.480f, 0.100f, false }, // acompanha o titulo
+    { 12.0f, 0.480f, 0.100f, false },
+};
+
+static Vector2 PcPosicaoMouse(float t)
+{
+    int n = (int)(sizeof(pcCaminho) / sizeof(pcCaminho[0]));
+    float larg = (float)GetScreenWidth();
+    float alt = (float)GetScreenHeight();
+
+    if (t <= pcCaminho[0].t) return (Vector2){ pcCaminho[0].x * larg, pcCaminho[0].y * alt };
+    if (t >= pcCaminho[n - 1].t) return (Vector2){ pcCaminho[n - 1].x * larg, pcCaminho[n - 1].y * alt };
+
+    for (int i = 1; i < n; i++)
+    {
+        if (t <= pcCaminho[i].t)
+        {
+            float u = (t - pcCaminho[i - 1].t) / (pcCaminho[i].t - pcCaminho[i - 1].t);
+            if (pcCaminho[i].suave) u = u * u * (3.0f - 2.0f * u);   // acelera e freia
+            float x = pcCaminho[i - 1].x + (pcCaminho[i].x - pcCaminho[i - 1].x) * u;
+            float y = pcCaminho[i - 1].y + (pcCaminho[i].y - pcCaminho[i - 1].y) * u;
+            return (Vector2){ x * larg, y * alt };
+        }
+    }
+    return (Vector2){ 0, 0 };
+}
+
+// Seta de mouse (contorno preto, miolo branco)
+static void PcDesenharCursor(Vector2 p, bool apertado)
+{
+    float e = apertado ? 0.92f : 1.0f;
+    Vector2 poli[7] = { {0, 0}, {0, 17}, {4, 13}, {7, 20}, {10, 19}, {7, 12}, {12, 12} };
+    for (int i = 0; i < 7; i++) { poli[i].x = p.x + poli[i].x * 1.5f * e; poli[i].y = p.y + poli[i].y * 1.5f * e; }
+
+    // miolo: dois pedacos convexos (desenhados nas duas orientacoes)
+    Vector2 a[3] = { poli[0], poli[1], poli[6] };
+    Vector2 b[4] = { poli[2], poli[3], poli[4], poli[5] };
+    DrawTriangle(a[0], a[1], a[2], WHITE); DrawTriangle(a[0], a[2], a[1], WHITE);
+    DrawTriangle(b[0], b[1], b[2], WHITE); DrawTriangle(b[0], b[2], b[1], WHITE);
+    DrawTriangle(b[0], b[2], b[3], WHITE); DrawTriangle(b[0], b[3], b[2], WHITE);
+    DrawTriangle(poli[1], poli[2], poli[6], WHITE); DrawTriangle(poli[1], poli[6], poli[2], WHITE);
+
+    for (int i = 0; i < 7; i++)
+        DrawLineEx(poli[i], poli[(i + 1) % 7], 2.0f, BLACK);
+}
+
+static void PcDesenharImagem(Texture2D tex, float alfa)
+{
+    DrawTexturePro(
+        tex,
+        (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
+        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Vector2){ 0, 0 },
+        0.0f,
+        Fade(WHITE, alfa)
+    );
+}
+
+// Tres blocos azuis que correm no trilho, como na tela de boot
+static void PcDesenharBarra(float t)
+{
+    float larg = (float)GetScreenWidth();
+    float alt = (float)GetScreenHeight();
+    float x0 = PC_TRILHO.x * larg, y0 = PC_TRILHO.y * alt;
+    float w = PC_TRILHO.width * larg, h = PC_TRILHO.height * alt;
+
+    float bloco = h * 0.9f;
+    float passo = bloco * 1.35f;
+    float ciclo = w + 3.0f * passo;
+    float pos = fmodf(t * 150.0f, ciclo) - 3.0f * passo;       // 150 px por segundo
+
+    BeginScissorMode((int)x0, (int)y0, (int)w, (int)h);
+    for (int i = 0; i < 3; i++)
+    {
+        float bx = x0 + pos + i * passo;
+        DrawRectangleGradientV((int)bx, (int)(y0 + h * 0.05f), (int)bloco, (int)(h * 0.9f),
+                               (Color){150, 190, 255, 255}, (Color){30, 80, 210, 255});
+    }
+    EndScissorMode();
+}
+
+static void PcDesenhar(const Assets *assets)
+{
+    float t = pcTempo;
+    float larg = (float)GetScreenWidth();
+    float alt = (float)GetScreenHeight();
+
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BLACK);
+
+    if (t < PC_BOOT_FIM + PC_DESK_FADE)
+    {
+        float a = (t < PC_BOOT_ENTRA) ? t / PC_BOOT_ENTRA : 1.0f;
+        PcDesenharImagem(assets->pcBoot, a);
+        if (t >= PC_BOOT_ENTRA * 0.5f) PcDesenharBarra(t);
+    }
+
+    if (t >= PC_BOOT_FIM)
+    {
+        float a = (t - PC_BOOT_FIM) / PC_DESK_FADE;
+        if (a > 1.0f) a = 1.0f;
+        PcDesenharImagem(assets->pcDesktop, a);
+
+        // icone selecionado depois do primeiro clique
+        if (t >= PC_CLIQUE_1 && t < PC_PERFIL_INICIO + PC_PERFIL_FADE)
+        {
+            Rectangle r = { PC_ICONE.x * larg, PC_ICONE.y * alt, PC_ICONE.width * larg, PC_ICONE.height * alt };
+            DrawRectangleRounded(r, 0.08f, 6, Fade((Color){49, 106, 197, 255}, 0.35f));
+            DrawRectangleLinesEx(r, 1.5f, Fade((Color){120, 170, 255, 255}, 0.9f));
+        }
+    }
+
+    if (t >= PC_PERFIL_INICIO)
+    {
+        float a = (t - PC_PERFIL_INICIO) / PC_PERFIL_FADE;
+        if (a > 1.0f) a = 1.0f;
+        PcDesenharImagem(assets->pcPerfil, a);
+    }
+
+    // mouse
+    if (t >= pcCaminho[0].t)
+    {
+        Vector2 m = PcPosicaoMouse(t);
+        bool apertado = false;
+        float cliques[2] = { PC_CLIQUE_1, PC_CLIQUE_2 };
+        for (int i = 0; i < 2; i++)
+        {
+            float d = t - cliques[i];
+            if (d >= 0.0f && d < 0.12f) apertado = true;
+            if (d >= 0.0f && d < 0.35f)
+                DrawCircleLinesV(m, 6.0f + d * 70.0f, Fade(WHITE, 1.0f - d / 0.35f));
+        }
+        PcDesenharCursor(m, apertado);
+    }
+
+    // saida: fade para preto
+    if (pcSaida >= 0.0f)
+    {
+        float a = pcSaida / PC_SAIDA;
+        if (a > 1.0f) a = 1.0f;
+        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, a));
+    }
+    else if (t >= PC_ESPERA)
+    {
+        DrawText("ESPAÇO  >>", 1040, 672, 22, Fade(WHITE, 0.85f));
+    }
 }
 
 // Tempo restante do flash (0 = sem flash)
@@ -231,7 +440,8 @@ static void DesenharAvisoSom(void)
 
 // Desenha uma personagem mantendo a proporcao da imagem.
 // altura: altura na tela | yTopo: posicao vertical | xDireita: borda direita
-static void DrawPersonagem(Texture2D tex, float altura, float yTopo, float xDireita)
+// espelhar: true vira a imagem na horizontal (largura negativa na origem)
+static void DrawPersonagemEx(Texture2D tex, float altura, float yTopo, float xDireita, bool espelhar)
 {
     float largura = altura * (float)tex.width / (float)tex.height;
 
@@ -239,13 +449,35 @@ static void DrawPersonagem(Texture2D tex, float altura, float yTopo, float xDire
 
     DrawTexturePro(
         tex,
-        (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
+        (Rectangle){ 0, 0, espelhar ? -(float)tex.width : (float)tex.width, (float)tex.height },
         destino,
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
     );
 }
+
+static void DrawPersonagem(Texture2D tex, float altura, float yTopo, float xDireita)
+{
+    DrawPersonagemEx(tex, altura, yTopo, xDireita, false);
+}
+
+// Igual ao DrawPersonagemEx, mas a posicao horizontal e a da borda ESQUERDA
+// (as medidas do Figma: X, Y e altura)
+static void DrawPersonagemEsq(Texture2D tex, float altura, float yTopo, float xEsquerda, bool espelhar)
+{
+    float largura = altura * (float)tex.width / (float)tex.height;
+
+    DrawPersonagemEx(tex, altura, yTopo, xEsquerda + largura, espelhar);
+}
+
+// Posicao e tamanho dos personagens no Ato 2 (medidas do Figma, quadro 1280x720)
+#define ATO2_JOAO_X      110.0f
+#define ATO2_JOAO_Y      -22.0f
+#define ATO2_JOAO_ALTURA 884.0f
+#define ATO2_LIA_X       712.0f
+#define ATO2_LIA_Y        25.0f
+#define ATO2_LIA_ALTURA  735.0f
 
 // Flash branco-rosado com "glitch" que se apaga aos poucos
 static void DesenharFlash(void)
@@ -381,8 +613,8 @@ typedef enum
     FUNDO_CG_ESCREVEM,
     FUNDO_CG_PROFESSORA,
     FUNDO_CG_ENSAIO,
-    FUNDO_PROVISORIO_CASA,      // imagem provisoria desenhada pelo jogo
-    FUNDO_PROVISORIO_ESCOLA     // imagem provisoria desenhada pelo jogo
+    FUNDO_CG_CASA_NOITE,        // Lia treinando em casa, de noite
+    FUNDO_CG_FRENTE_ESCOLA      // frente da escola, de dia
 } FundoId;
 
 typedef struct
@@ -421,8 +653,8 @@ static VisualCena VisualDaCena(SceneID id)
         case SCENE_ATO2_C4:
         case SCENE_ATO2_C4_ZERO:        return (VisualCena){ FUNDO_LANHOUSE,       2007, true  };
 
-        case SCENE_ATO2_CG_CASA_NOITE:  return (VisualCena){ FUNDO_PROVISORIO_CASA,   0, false };
-        case SCENE_ATO2_CG_FRENTE_ESCOLA: return (VisualCena){ FUNDO_PROVISORIO_ESCOLA, 0, false };
+        case SCENE_ATO2_CG_CASA_NOITE:  return (VisualCena){ FUNDO_CG_CASA_NOITE,     0, false };
+        case SCENE_ATO2_CG_FRENTE_ESCOLA: return (VisualCena){ FUNDO_CG_FRENTE_ESCOLA,  0, false };
 
         case SCENE_ATO2_CG_ESCREVEM:    return (VisualCena){ FUNDO_CG_ESCREVEM,    0,    false };
         case SCENE_ATO2_CG_PROFESSORA:
@@ -468,6 +700,10 @@ static Texture2D TexturaLia(Assets *assets, int era, Pose pose)
         case POSE_CONTRARIADA:  return assets->lia07[4];
         case POSE_NOSTALGICA:   return assets->lia07[5];
         case POSE_RINDO:        return assets->lia07[6];
+        case POSE_FELIZ:        return assets->lia07[7];
+        case POSE_TRISTE:       return assets->lia07[8];
+        case POSE_PENSATIVA:    return assets->lia07[9];
+        case POSE_DETERMINADA:  return assets->lia07[10];
         default:                return assets->lia07[0];
     }
 }
@@ -485,108 +721,39 @@ static void DesenharImagemTela(Texture2D tex)
     );
 }
 
-// Cenario provisorio da lan house (a arte definitiva ainda sera feita)
-// ---------------------------------------------------------------
-// IMAGENS PROVISORIAS (ainda nao ha arte): desenhadas aqui com formas.
-// Quando a arte existir, troque por DesenharImagemTela(textura).
-// ---------------------------------------------------------------
-
-static void DesenharAvisoProvisorio(const char *descricao)
+// Zoom sutil e lento em CG: a imagem cresce ate ~6% em 10 s, mantendo o
+// ponto de foco (fx, fy, de 0 a 1) parado na tela. O tempo reinicia quando
+// a cena muda (nao a cada fala).
+static void DesenharImagemZoom(Texture2D tex, SceneID cena, float fx, float fy)
 {
-    DrawRectangleRounded((Rectangle){ 340, 40, 600, 86 }, 0.3f, 8, Fade(BLACK, 0.55f));
-    DrawCenteredText("IMAGEM PROVISÓRIA", 52, 22, (Color){ 255, 105, 200, 255 });
-    DrawCenteredText(descricao, 84, 26, WHITE);
+    static SceneID cenaAnterior = (SceneID)-1;
+    static float tempo = 0.0f;
+    static double ultimoDesenho = -1.0;
+    double agora = GetTime();
+    // reinicia se a cena mudou ou se a CG ficou um tempo sem ser desenhada
+    if (cena != cenaAnterior || agora - ultimoDesenho > 0.3) { cenaAnterior = cena; tempo = 0.0f; }
+    ultimoDesenho = agora;
+    if (fadeFase != FADE_SEGURANDO) tempo += GetFrameTime();   // nao conta o tempo da tela preta
+
+    float t = tempo / 10.0f;
+    if (t > 1.0f) t = 1.0f;
+    t = t * (2.0f - t);                      // suaviza a chegada
+    float s = 1.0f + 0.06f * t;
+
+    float w = (float)tex.width / s;
+    float h = (float)tex.height / s;
+    float x0 = fx * ((float)tex.width - w);
+    float y0 = fy * ((float)tex.height - h);
+
+    DrawTexturePro(
+        tex,
+        (Rectangle){ x0, y0, w, h },
+        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Vector2){ 0, 0 },
+        0.0f,
+        WHITE
+    );
 }
-
-// Quarto da Lia de noite: janela com lua, mesa com lampada e a Lia curvada sobre o papel
-static void DesenharProvisorioCasa(void)
-{
-    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 12, 16, 44, 255 }, (Color){ 40, 30, 80, 255 });
-
-    // janela com lua e estrelas
-    Rectangle janela = { 180, 150, 360, 280 };
-    DrawRectangleRec(janela, (Color){ 8, 12, 36, 255 });
-    DrawCircle(430, 240, 40, (Color){ 250, 245, 215, 255 });
-    DrawCircle(448, 232, 36, (Color){ 8, 12, 36, 255 });
-    for (int i = 0; i < 9; i++)
-        DrawCircle((int)janela.x + 30 + (i * 83) % 300, (int)janela.y + 30 + (i * 47) % 200, 2, WHITE);
-    DrawRectangleLinesEx(janela, 8, (Color){ 90, 70, 120, 255 });
-    DrawLine((int)(janela.x + janela.width / 2), (int)janela.y, (int)(janela.x + janela.width / 2), (int)(janela.y + janela.height), (Color){ 90, 70, 120, 255 });
-
-    // chao e mesa
-    DrawRectangle(0, 560, 1280, 160, (Color){ 30, 22, 52, 255 });
-    DrawRectangle(620, 400, 520, 30, (Color){ 96, 64, 50, 255 });
-    DrawRectangle(650, 430, 24, 150, (Color){ 76, 50, 40, 255 });
-    DrawRectangle(1086, 430, 24, 150, (Color){ 76, 50, 40, 255 });
-
-    // luz da lampada
-    BrilhoSuave(930, 330, 300, (Color){ 255, 220, 140, 255 }, 0.35f);
-    DrawRectangle(924, 330, 8, 70, (Color){ 60, 60, 70, 255 });
-    DrawTriangle((Vector2){ 928, 290 }, (Vector2){ 880, 335 }, (Vector2){ 976, 335 }, (Color){ 255, 200, 90, 255 });
-
-    // papel e Lia (silhueta)
-    DrawRectangle(780, 385, 90, 16, (Color){ 245, 240, 225, 255 });
-    DrawCircle(760, 330, 34, (Color){ 120, 80, 70, 255 });
-    DrawRectangle(725, 360, 70, 55, (Color){ 255, 105, 200, 255 });
-}
-
-// Frente da escola de dia: ceu, predio, porta e alguns estudantes
-static void DesenharProvisorioEscola(void)
-{
-    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 120, 190, 250, 255 }, (Color){ 220, 240, 255, 255 });
-    DrawCircle(1100, 130, 60, (Color){ 255, 236, 150, 255 });
-
-    // predio
-    DrawRectangle(240, 190, 800, 380, (Color){ 214, 120, 96, 255 });
-    DrawRectangle(240, 170, 800, 30, (Color){ 150, 80, 70, 255 });
-
-    for (int linha = 0; linha < 2; linha++)
-        for (int col = 0; col < 6; col++)
-            DrawRectangle(290 + col * 125, 230 + linha * 130, 80, 80, (Color){ 170, 215, 245, 255 });
-
-    // porta
-    DrawRectangle(590, 440, 100, 130, (Color){ 90, 60, 50, 255 });
-    DrawText("ESCOLA", 560, 396, 36, WHITE);
-
-    // chao
-    DrawRectangle(0, 570, 1280, 150, (Color){ 150, 150, 160, 255 });
-
-    // estudantes (bonecos simples)
-    Color cores[] = { (Color){ 255, 105, 200, 255 }, (Color){ 39, 172, 234, 255 }, (Color){ 76, 175, 80, 255 }, (Color){ 255, 193, 7, 255 } };
-
-    for (int i = 0; i < 7; i++)
-    {
-        int x = 130 + i * 160;
-        int y = 580 + (i % 2) * 40;
-
-        DrawCircle(x, y, 18, (Color){ 120, 85, 70, 255 });
-        DrawRectangle(x - 20, y + 18, 40, 60, cores[i % 4]);
-    }
-}
-
-static void DesenharLanHouse(void)
-{
-    float tempo = (float)GetTime();
-
-    DrawRectangleGradientV(0, 0, 1280, 720, (Color){22, 20, 58, 255}, (Color){66, 36, 100, 255});
-
-    // fileira de monitores ao fundo
-    for (int i = 0; i < 6; i++)
-    {
-        float x = 70.0f + i * 200.0f;
-        float y = 200.0f;
-        float brilho = 0.30f + 0.10f * sinf(tempo * 2.0f + i);
-
-        DrawRectangleRounded((Rectangle){ x, y, 150, 110 }, 0.12f, 6, (Color){ 18, 18, 34, 255 });
-        DrawRectangle((int)x + 10, (int)y + 10, 130, 80, Fade((Color){ 80, 200, 255, 255 }, brilho));
-        DrawRectangle((int)x + 62, (int)y + 110, 26, 22, (Color){ 18, 18, 34, 255 });
-    }
-
-    // bancada
-    DrawRectangle(0, 360, 1280, 360, (Color){ 40, 26, 72, 255 });
-    DrawRectangle(0, 360, 1280, 6, (Color){ 255, 105, 200, 255 });
-}
-
 
 // =====================================================
 // ESCOLHAS (aparecem sobre a propria tela de dialogo)
@@ -850,6 +1017,7 @@ static void FimDaCena(GameState *game, Scene scene)
         case SCENE_ATO2_CG_ESCREVEM:
         case SCENE_ATO2_CG_CASA_NOITE:
         case SCENE_ATO2_CG_ENSAIO:
+        case SCENE_ATO1_IA_B:           // fim do Ato 1: cartao "FIM DO ATO 1" e entra no Ato 2
             game->dialogueIndex = scene.dialogueCount - 1;
             IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, scene.nextScene);
             return;
@@ -917,6 +1085,7 @@ void InitGame(GameState *game)
     game->senhaNoQuarto = false;
 
     fadeFase = FADE_NENHUM;
+    pcAtivo = false;
 
     Tokens_Reiniciar();
     BarraTokens_Reiniciar();
@@ -952,6 +1121,7 @@ static void ComecarNovoJogo(GameState *game)
 
     flashTimer = 0.0f;
     fadeFase = FADE_NENHUM;
+    pcAtivo = false;
 
     game->choice = 0;
     game->senhaNoQuarto = false;
@@ -1340,9 +1510,33 @@ void UpdateGame(GameState *game)
             SaveGame(game);
 
             fadeFase = FADE_NENHUM;
+            pcAtivo = false;
 
             game->currentScreen = SCREEN_MENU;
 
+            return;
+        }
+
+        // Sequencia do computador (Doors XP): nada responde; ESPACO/ENTER (com a pagina aberta) segue para o Ato 2
+        if (pcAtivo)
+        {
+            if (pcTempo < PC_ESPERA) pcTempo += GetFrameTime();
+            if (pcTempo > PC_ESPERA) pcTempo = PC_ESPERA;
+
+            // ESPACO/ENTER: depois que a pagina abriu, escurece e entra no Ato 2
+            if (pcSaida < 0.0f && pcTempo >= PC_PERFIL_INICIO + PC_PERFIL_FADE &&
+                (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)))
+                pcSaida = 0.0f;
+
+            if (pcSaida >= 0.0f) pcSaida += GetFrameTime();
+
+            if (pcSaida >= PC_SAIDA)
+            {
+                pcAtivo = false;
+                ChangeScene(game, SCENE_ATO2_QUARTO);
+                SaveGame(game);
+                IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_LANHOUSE, SCENE_ATO2_QUARTO);
+            }
             return;
         }
 
@@ -1357,11 +1551,28 @@ void UpdateGame(GameState *game)
         {
             fadeTempo += GetFrameTime();
 
+            if (fadeFase == FADE_ESCURECENDO && fadeTempo >= fadeDuracao && fadeDestino == SCENE_ATO2_QUARTO)
+            {
+                // fim do Ato 1: antes do Ato 2 roda a sequencia do computador (Doors XP)
+                fadeFase = FADE_NENHUM;
+                pcAtivo = true;
+                pcTempo = 0.0f;
+                pcSaida = -1.0f;
+                return;
+            }
+
             if (fadeFase == FADE_ESCURECENDO && fadeTempo >= fadeDuracao)
             {
                 ChangeScene(game, fadeDestino);
                 SaveGame(game);
 
+                if (SegurarPretoAntes(fadeDestino))
+                    IniciarFade(FADE_SEGURANDO, FADE_TEXTO_SEGUNDOS, fadeDestino);
+                else
+                    IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_LANHOUSE, fadeDestino);
+            }
+            else if (fadeFase == FADE_SEGURANDO && fadeTempo >= fadeDuracao)
+            {
                 IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_LANHOUSE, fadeDestino);
             }
             else if (fadeFase == FADE_CLAREANDO && fadeTempo >= fadeDuracao)
@@ -1369,7 +1580,7 @@ void UpdateGame(GameState *game)
                 fadeFase = FADE_NENHUM;
             }
 
-            if (fadeFase == FADE_ESCURECENDO) return;
+            if (fadeFase == FADE_ESCURECENDO || fadeFase == FADE_SEGURANDO) return;
         }
 
         // Enquanto ha uma escolha na tela, so as opcoes respondem
@@ -1715,27 +1926,20 @@ void DrawGame(
             case FUNDO_2026:          DesenharImagemTela(assets->bgPresent);     break;
             case FUNDO_2007:          DesenharImagemTela(assets->bg2007);        break;
             case FUNDO_CORREDOR:      DesenharImagemTela(assets->bgCorredor);    break;
-            case FUNDO_LANHOUSE:      DesenharLanHouse();                        break;
+            case FUNDO_LANHOUSE:      DesenharImagemTela(assets->bgLanhouse);    break;
             case FUNDO_CG_TELA:       DesenharImagemTela(assets->cgTela2026);    break;
-            case FUNDO_CG_ESCREVEM:   DesenharImagemTela(assets->cgEscrevem);    break;
-            case FUNDO_CG_PROFESSORA: DesenharImagemTela(assets->cgProfessora);  break;
-            case FUNDO_CG_ENSAIO:     DesenharImagemTela(assets->cgEnsaio);      break;
-            case FUNDO_PROVISORIO_CASA:
-                DesenharProvisorioCasa();
-                DesenharAvisoProvisorio("Lia treinando o discurso em casa, à noite");
-                break;
-            case FUNDO_PROVISORIO_ESCOLA:
-                DesenharProvisorioEscola();
-                DesenharAvisoProvisorio("Frente da escola, de dia");
-                break;
+            case FUNDO_CG_ESCREVEM:   DesenharImagemZoom(assets->cgEscrevem, game->currentScene, 0.65f, 0.40f);    break;
+            case FUNDO_CG_PROFESSORA: DesenharImagemZoom(assets->cgProfessora, game->currentScene, 0.45f, 0.40f);  break;
+            case FUNDO_CG_ENSAIO:     DesenharImagemZoom(assets->cgEnsaio, game->currentScene, 0.70f, 0.40f);      break;
+            case FUNDO_CG_CASA_NOITE:    DesenharImagemZoom(assets->cgCasaNoite, game->currentScene, 0.70f, 0.40f);    break;
+            case FUNDO_CG_FRENTE_ESCOLA: DesenharImagemZoom(assets->cgFrenteEscola, game->currentScene, 0.33f, 0.55f); break;
         }
-
-        // Escolha 1 (corrida): ainda sem arte da Lia determinada
-        if (game->currentScene == SCENE_ATO2_DETERMINADA)
-            DesenharAvisoProvisorio("Imagem da Lia determinada (falta a arte)");
 
         // Personagens: o amigo a esquerda, a Lia a direita
         // (altura, posicao Y do topo, borda direita)
+
+        // O Ato 2 usa o layout do Figma; o Ato 1 continua como estava
+        bool noAto2 = game->currentScene >= SCENE_ATO2_QUARTO && game->currentScene < SCENE_EPILOGUE;
 
         // Na cena 3.2 (lan house sem o Joao) ele so entra na segunda fala
         bool mostrarAmigo = visual.amigo;
@@ -1753,17 +1957,35 @@ void DrawGame(
             if (game->currentScene == SCENE_ATO2_ENCONTRO)
                 texAmigo = assets->amigoSurpreso[encontroTempo < ENCONTRO_VIRA_SEGUNDOS ? 0 : 1];
 
-            DrawPersonagem(texAmigo, 900.0f, -101.0f, 610.0f);
+            if (noAto2)
+                DrawPersonagemEsq(texAmigo, ATO2_JOAO_ALTURA, ATO2_JOAO_Y, ATO2_JOAO_X, false);
+            else
+                DrawPersonagem(texAmigo, 900.0f, -101.0f, 610.0f);
         }
 
         if (visual.lia != 0)
         {
             Pose poseLia = PoseDe(&scene, game->dialogueIndex, "Lia");
 
+            // Escolha 1 (corrida): a Lia aparece determinada
+            if (game->currentScene == SCENE_ATO2_DETERMINADA)
+                poseLia = POSE_DETERMINADA;
+
+            // Reacao da Lia numa fala da IA (se a fala da IA tiver uma expressao, ela aparece)
+            else if (strcmp(dialogue.speaker, "IA") == 0 && dialogue.pose != POSE_PADRAO)
+                poseLia = dialogue.pose;
+
             Texture2D texLia = TexturaLia(assets, visual.lia, poseLia);
 
+            // No Ato 2 a Lia fica a direita e deve olhar para a esquerda (para o Joao).
+            // Estas 4 imagens olham para a direita, entao so no Ato 2 viram na horizontal.
+            bool poseOlhaDireita = (poseLia == POSE_PADRAO || poseLia == POSE_CONFUSA ||
+                                    poseLia == POSE_BRAVA  || poseLia == POSE_SURPRESA);
+
+            // Lia de 2007: mesmo tamanho e posicao em todos os atos.
+            // So no Ato 2 ela e espelhada (para olhar para o Joao).
             if (visual.lia == 2007)
-                DrawPersonagem(texLia, 900.0f, -101.0f, 1250.0f);
+                DrawPersonagemEsq(texLia, ATO2_LIA_ALTURA, ATO2_LIA_Y, ATO2_LIA_X, noAto2 && poseOlhaDireita);
             else
                 DrawPersonagem(texLia, 820.0f, -7.0f, 1250.0f);
         }
@@ -1818,6 +2040,9 @@ void DrawGame(
 
         // Fade para preto (por cima de tudo, menos do aviso de som)
         DesenharFade();
+
+        // Sequencia do computador por cima de tudo
+        if (pcAtivo) PcDesenhar(assets);
 
         // Exibe o aviso de som por cima da tela atual
         DesenharAvisoSom();

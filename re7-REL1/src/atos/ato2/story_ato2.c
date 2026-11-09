@@ -11,10 +11,10 @@
 Dialogue ato2QuartoDialogues[] =
 {
     { "Lia", "Todo esse trabalho pra isso? Eu quero voltar e fazer a minha palestra real!", POSE_BRAVA },
-    { "IA",  "Você volta, mas só se vencer os desafios daqui." },
+    { "IA",  "Você volta, mas só se vencer os desafios daqui.", POSE_CONTRARIADA },
     { "IA",  "Você não está só! Mas tenha cuidado..." },
-    { "IA",  "A barra de tokens mostra quanto de ajuda eu ainda posso dar. Se ela zerar, eu desligo e não consigo te levar de volta." },
-    { "Lia", "Então vamos logo para a escola resolver isso.", POSE_DECIDIDA }
+    { "IA",  "A barra de tokens mostra quanto de ajuda eu ainda posso dar. Se ela zerar, eu desligo e não consigo te levar de volta.", POSE_SURPRESA },
+    { "Lia", "Então vamos logo para a escola resolver isso.", POSE_DETERMINADA }
     // a barra de tokens aparece na tela; depois a tela escurece devagar
 };
 
@@ -25,7 +25,7 @@ Dialogue ato2CorredorDialogues[] =
 {
     { "Lia", "Assistir aulas foi estranhamente legal. Eu não esperava sentir tanta nostalgia.", POSE_SURPRESA },
     { "Lia", "Aquele é o... João?", POSE_SURPRESA },
-    { "IA",  "Sim. O seu amigo João de quem você se afastou." },
+    { "IA",  "Sim. O seu amigo João de quem você se afastou.", POSE_TRISTE },
     { "IA",  "Ele seria um aliado importante nos seus desafios..." }
     // depois: ESCOLHA 1 (nao usa a barra)
 };
@@ -40,7 +40,7 @@ Dialogue ato2DeterminadaDialogues[] =
 // (ela feliz, ele surpreso; depois a tela escurece devagar e volta no corredor)
 Dialogue ato2EncontroDialogues[] =
 {
-    { "Lia", "Ufa, consegui alcançá-lo!", POSE_RINDO }
+    { "Lia", "Ufa, consegui alcançá-lo!", POSE_FELIZ }
 };
 
 // RESULTADO 2.1: corredor, depois de alcancar o Joao
@@ -49,7 +49,7 @@ Dialogue ato2Res21Dialogues[] =
     { "João", "Oi, Lia! Que bom encontrar você. A professora falou que você também se inscreveu no concurso de oratória!", POSE_FELIZ },
     { "Lia",  "Me inscrevi sim! O que você acha de...", POSE_CONFUSA },
     { "João", "A galera vai se encontrar na Lan House depois do almoço, bora jogar um CS e depois treinar um pouco?", POSE_FELIZ },
-    { "Lia",  "Te encontro lá, João!", POSE_RINDO }
+    { "Lia",  "Te encontro lá, João!", POSE_FELIZ }
     // fade lento para preto e vai para a Cena 3.1
 };
 
@@ -78,9 +78,9 @@ Dialogue ato2LanhouseSemDialogues[] =
 {
     { "Lia",  "Eu tinha esquecido como esse jogo era legal!", POSE_RINDO },
     { "João", "Oi, Lia! Que bom encontrar você. A professora falou que você também se inscreveu no concurso de oratória!", POSE_FELIZ },
-    { "Lia",  "Sim, me inscrevi!", POSE_RINDO },
+    { "Lia",  "Sim, me inscrevi!", POSE_FELIZ },
     { "João", "E seu discurso já está pronto?", POSE_FELIZ },
-    { "Lia",  "Ainda não...", POSE_CONFUSA },
+    { "Lia",  "Ainda não...", POSE_PENSATIVA },
     { "IA",   "Vejo que está se divertindo. Agora que precisa focar no concurso, como quer seguir?" }
     // depois: ESCOLHA 2
 };
@@ -98,16 +98,16 @@ Dialogue ato2IAEscreveDialogues[] =
 // Opcao 2: so uma ideia de abertura (-1 token)
 Dialogue ato2UmaIdeiaDialogues[] =
 {
-    { "Lia", "Só uma ideia pra começar.", POSE_CONFUSA },
+    { "Lia", "Só uma ideia pra começar.", POSE_PENSATIVA },
     { "IA",  "Abra com uma pergunta pra plateia. O resto é seu." },
-    { "Lia", "Boa ideia... Já sei como devo começar...", POSE_RINDO }
+    { "Lia", "Boa ideia... Já sei como devo começar...", POSE_FELIZ }
 };
 
 // Opcao 3: fazer com a ajuda do Joao (+1 token, maximo 3)
 Dialogue ato2ComJoaoDialogues[] =
 {
     { "IA",  "Boa ideia! João é muito bom em oratória..." },
-    { "Lia", "João, ainda não sei por onde começar. Pode me ajudar?", POSE_RINDO }
+    { "Lia", "João, ainda não sei por onde começar. Pode me ajudar?", POSE_FELIZ }
 };
 
 
@@ -117,14 +117,14 @@ Dialogue ato2ComJoaoDialogues[] =
 Dialogue ato2C4Dialogues[] =
 {
     { "João", "Bora escrever o discurso? A gente faz no papel mesmo, do nosso jeito.", POSE_FELIZ },
-    { "Lia",  "Bora!", POSE_RINDO }
+    { "Lia",  "Bora!", POSE_FELIZ }
 };
 
 // Barra em 0 (a IA escreveu o discurso). A IA esta offline.
 Dialogue ato2C4ZeroDialogues[] =
 {
     { "João", "Então?", POSE_FELIZ },
-    { "Lia",  "Na verdade eu já tenho discurso pronto...", POSE_CONFUSA },
+    { "Lia",  "Na verdade eu já tenho discurso pronto...", POSE_PENSATIVA },
     { "João", "Já tem o discurso pronto? Então bora ensaiar.", POSE_FELIZ }
 };
 
@@ -140,13 +140,13 @@ Dialogue ato2CgEnsaioDialogues[] =
     { "", "" }
 };
 
-// IMAGEM PROVISORIA (desenhada pelo jogo): a Lia treina o discurso em casa, de noite.
+// Imagem (sem fala): a Lia treina o discurso em casa, de noite.
 Dialogue ato2CgCasaNoiteDialogues[] =
 {
     { "", "" }
 };
 
-// IMAGEM PROVISORIA (desenhada pelo jogo): de dia, na frente da escola.
+// Imagem (sem fala): de dia, na frente da escola.
 Dialogue ato2CgFrenteEscolaDialogues[] =
 {
     { "", "" }
