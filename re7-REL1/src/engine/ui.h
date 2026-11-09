@@ -3,6 +3,13 @@
 
 #include "raylib.h"
 
+void UiLoadFonts(void);
+void UiUnloadFonts(void);
+void UiDrawText(const char *text, int x, int y, int fontSize, Color color);
+int UiMeasureText(const char *text, int fontSize);
+void UiDrawTextEmphasis(const char *text, int x, int y, int fontSize, Color color);
+int UiMeasureTextEmphasis(const char *text, int fontSize);
+
 
 void DrawCenteredText(
     const char *text,

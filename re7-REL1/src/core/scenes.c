@@ -2,6 +2,7 @@
 #include "story.h"
 #include "story_ato1.h"
 #include "story_ato2.h"
+#include "story_ato3.h"
 
 
 // =====================================================
@@ -63,15 +64,25 @@ Scene GetScene(SceneID id)
         case SCENE_ATO2_CG_ESCREVEM:
             return (Scene){ ato2CgEscrevemDialogues, GetAto2CgEscrevemCount(), SCENE_ATO2_CG_PROFESSORA };
 
-        case SCENE_ATO2_CG_PROFESSORA:
-            return (Scene){ ato2CgProfessoraDialogues, GetAto2CgProfessoraCount(), SCENE_EPILOGUE };
+        case SCENE_ATO2_CG_PROFESSORA: 
+        return (Scene){ ato2CgProfessoraDialogues, GetAto2CgProfessoraCount(), SCENE_ATO3_ABERTURA };
 
         case SCENE_ATO2_ENSAIO:
             return (Scene){ ato2EnsaioDialogues, GetAto2EnsaioCount(), SCENE_ATO2_CG_ENSAIO };
 
         case SCENE_ATO2_CG_ENSAIO:
-            return (Scene){ ato2CgEnsaioDialogues, GetAto2CgEnsaioCount(), SCENE_EPILOGUE };
+            return (Scene){ ato2CgEnsaioDialogues, GetAto2CgEnsaioCount(), SCENE_ATO3_ABERTURA }; 
+        
+        case SCENE_ATO3_ABERTURA:
+            return (Scene){ ato3AberturaDialogues, GetAto3AberturaCount(), SCENE_ATO3_OFERTA };
 
+        case SCENE_ATO3_RESERVA:
+            return (Scene){ ato3ReservaDialogues, GetAto3ReservaCount(), SCENE_ATO3_OFERTA };
+
+        case SCENE_ATO3_OFERTA:
+            return (Scene){ ato3OfertaDialogues, GetAto3OfertaCount(), SCENE_EPILOGUE };
+        
+          
 
         // ---------------- Epilogo (provisorio) ----------------
 

@@ -14,6 +14,7 @@
 #include "barra_tokens.h"
 #include "tokens.h"
 #include "raylib.h"
+#include "ui.h"
 #include <math.h>
 
 #define COR_CLARA    (Color){ 232, 240, 250, 255 }  // #E8F0FA
@@ -150,9 +151,9 @@ void BarraTokens_Desenhar(float x, float y)
         DrawCircleV((Vector2){ c.x, c.y + k * 0.6f }, raio, Misturar(corOrbe, COR_CLARA, k / 14.0f));
     }
     DrawEllipse((int)c.x, (int)c.y - 13, 13, 6, Fade(WHITE, 0.45f));
-    int largIA = MeasureText("IA", 20);
-    DrawText("IA", (int)c.x - largIA / 2 + 1, (int)c.y - 7, 20, Fade(COR_MARINHO, 0.6f));
-    DrawText("IA", (int)c.x - largIA / 2, (int)c.y - 8, 20, WHITE);
+    int largIA = UiMeasureText("IA", 20);
+    UiDrawText("IA", (int)c.x - largIA / 2 + 1, (int)c.y - 7, 20, Fade(COR_MARINHO, 0.6f));
+    UiDrawText("IA", (int)c.x - largIA / 2, (int)c.y - 8, 20, WHITE);
 
     // status do MSN
     Vector2 st = { c.x + 17, c.y + 17 };
@@ -160,10 +161,10 @@ void BarraTokens_Desenhar(float x, float y)
     DrawCircleV(st, 6, offline ? COR_CINZA : COR_VERDE);
 
     // titulo, status e contagem
-    DrawText("Tokens da IA", (int)x + 72, (int)y + 10, 10, COR_MARINHO);
+    UiDrawTextEmphasis("Tokens da IA", (int)x + 72, (int)y + 8, 14, COR_MARINHO);
     const char *status = offline ? "offline" : "online";
-    DrawText(status, (int)x + BARRA_LARGURA - 18 - MeasureText(status, 10), (int)y + 10, 10,
-             offline ? COR_CINZA : COR_VERDE);
+    UiDrawTextEmphasis(status, (int)x + BARRA_LARGURA - 18 - UiMeasureTextEmphasis(status, 14), (int)y + 8, 14,
+             offline ? COR_MARINHO : (Color){25, 105, 71, 255});
 
     // bateria unica dividida em 3
     Rectangle corpo = { x + 72, y + 28, 140, 30 };
@@ -171,6 +172,6 @@ void BarraTokens_Desenhar(float x, float y)
 
     // numero ao lado, como "3/3"
     const char *txt = TextFormat("%d/%d", valor, TOKENS_MAX);
-    DrawText(txt, (int)(corpo.x + corpo.width + 18), (int)corpo.y + 8, 16,
+    UiDrawText(txt, (int)(corpo.x + corpo.width + 18), (int)corpo.y + 8, 16,
              offline ? COR_CINZA : COR_MARINHO);
 }

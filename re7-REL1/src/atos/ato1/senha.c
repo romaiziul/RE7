@@ -27,6 +27,7 @@
 #include "senha.h"
 #include "tokens.h"
 #include "raylib.h"
+#include "ui.h"
 #include <string.h>
 
 // ---------- cores (paleta do kit visual) ----------
@@ -108,8 +109,8 @@ static const Rectangle BOTAO_2    = { 395, 395, 490, 40 };
 // ---------- funcoes auxiliares ----------
 static void TextoCentralizado(const char *texto, float centroX, float y, int tamanho, Color cor)
 {
-    int largura = MeasureText(texto, tamanho);
-    DrawText(texto, (int)(centroX - largura / 2.0f), (int)y, tamanho, cor);
+    int largura = UiMeasureText(texto, tamanho);
+    UiDrawText(texto, (int)(centroX - largura / 2.0f), (int)y, tamanho, cor);
 }
 
 static Rectangle RetanguloFragmento(int i)
@@ -286,8 +287,8 @@ static void DesenharFundo(void)
     DrawRectangleGradientH(640, 96, 640, 3, COR_ROSA, Fade(COR_CLARA, 0.2f));
     DrawRectangleGradientH(0, 637, 1280, 3, COR_AZUL, COR_CLARA);
 
-    DrawText("PC da", 40, 34, 26, COR_CLARA);
-    DrawText("LIA", 40 + MeasureText("PC da ", 26), 34, 26, COR_ROSA);
+    UiDrawText("PC da", 40, 34, 26, COR_CLARA);
+    UiDrawText("LIA", 40 + UiMeasureText("PC da ", 26), 34, 26, COR_ROSA);
 }
 
 static void DesenharLoginESenha(bool acertou)
@@ -300,7 +301,7 @@ static void DesenharLoginESenha(bool acertou)
     DrawRectangleGradientEx(foto, COR_ROSA, COR_AZUL, COR_AZUL, COR_ROSA);
     DrawRectangleLinesEx(foto, 3.0f, COR_CLARA);
     TextoCentralizado("L", foto.x + 30, foto.y + 16, 30, WHITE);
-    DrawText("LIA", CAMPO_X0, (int)PAINEL_LIA.y + 6, 24, WHITE);
+    UiDrawText("LIA", CAMPO_X0, (int)PAINEL_LIA.y + 6, 24, WHITE);
 
     for (int i = 0; i < SENHA_TAMANHO; i++) {
         Rectangle c = RetanguloCampo(i);
@@ -324,11 +325,11 @@ static void DesenharLoginESenha(bool acertou)
 
     // dica da senha (tautologia)
     const char *dica = "Dica da senha: A senha termina com 7 ou não termina.   s v ¬s";
-    int larg = MeasureText(dica, 16) + 28;
+    int larg = UiMeasureText(dica, 16) + 28;
     Rectangle caixa = { 640 - larg / 2.0f, 240, (float)larg, 28 };
     DrawRectangleRounded(caixa, 0.4f, 8, COR_DICA);
     DrawRectangleRoundedLinesEx(caixa, 0.4f, 8, 1.0f, (Color){ 201, 181, 74, 255 });
-    DrawText(dica, (int)caixa.x + 14, (int)caixa.y + 6, 16, COR_DICA_TXT);
+    UiDrawText(dica, (int)caixa.x + 14, (int)caixa.y + 6, 16, COR_DICA_TXT);
 
     // contador / avisos
     if (acertou) {
@@ -353,7 +354,7 @@ static void DesenharFragmentos(void)
         DrawRectangleRoundedLinesEx(r, 0.15f, 8, brilho ? 3.0f : 2.0f, brilho ? COR_VERDE : COR_AZUL);
 
         float cx = r.x + r.width / 2.0f;
-        TextoCentralizado(FRAGMENTOS[f].nome, cx, r.y + 8, 14, COR_ROSA);
+        TextoCentralizado(FRAGMENTOS[f].nome, cx, r.y + 7, 16, (Color){120, 38, 114, 255});
 
         if (descoberto[f]) {
             char letra[2] = { FRAGMENTOS[f].letra, '\0' };
@@ -363,7 +364,7 @@ static void DesenharFragmentos(void)
             TextoCentralizado("?", cx, r.y + 30, 28, COR_MARINHO);
         }
 
-        TextoCentralizado(FRAGMENTOS[f].pista, cx, r.y + 66, 13, (Color){ 40, 52, 100, 255 });
+        TextoCentralizado(FRAGMENTOS[f].pista, cx, r.y + 64, 15, (Color){ 40, 52, 100, 255 });
     }
 }
 
@@ -375,29 +376,29 @@ static void DesenharLogica(void)
     // proposicoes: uma por erro, as outras bloqueadas
     DrawRectangleRounded(esq, 0.08f, 8, Fade(COR_MARINHO, 0.5f));
     DrawRectangleRoundedLinesEx(esq, 0.08f, 8, 1.0f, COR_AZUL_MED);
-    DrawText("PROPOSIÇÕES", (int)esq.x + 16, (int)esq.y + 10, 14, COR_AZUL_MED);
+    UiDrawTextEmphasis("PROPOSIÇÕES", (int)esq.x + 16, (int)esq.y + 9, 16, COR_CLARA);
     for (int i = 0; i < QTD_PROPOSICOES; i++) {
         int y = (int)esq.y + 34 + i * 27;
         if (i < proposicoesLiberadas) {
-            DrawText(PROPOSICOES[i], (int)esq.x + 16, y, 16, COR_CLARA);
+            UiDrawText(PROPOSICOES[i], (int)esq.x + 16, y, 16, COR_CLARA);
         } else {
             char nome[2] = { "pqrs"[i], '\0' };
-            DrawText(nome, (int)esq.x + 16, y, 16, Fade(COR_CLARA, 0.5f));
+            UiDrawText(nome, (int)esq.x + 16, y, 16, Fade(COR_CLARA, 0.5f));
             DrawRectangleRounded((Rectangle){ esq.x + 44, (float)y - 2, 250, 22 }, 0.5f, 6, Fade(COR_CLARA, 0.12f));
-            DrawText(TextFormat("aparece no %dº erro", i + 1), (int)esq.x + 56, y + 1, 16, Fade(COR_CLARA, 0.5f));
+            UiDrawText(TextFormat("aparece no %dº erro", i + 1), (int)esq.x + 56, y + 1, 16, Fade(COR_CLARA, 0.5f));
         }
     }
 
     // expressoes: desde o inicio, com o resultado
     DrawRectangleRounded(dir, 0.08f, 8, Fade(COR_MARINHO, 0.5f));
     DrawRectangleRoundedLinesEx(dir, 0.08f, 8, 1.0f, COR_AZUL_MED);
-    DrawText("EXPRESSÕES", (int)dir.x + 16, (int)dir.y + 10, 14, COR_AZUL_MED);
+    UiDrawTextEmphasis("EXPRESSÕES", (int)dir.x + 16, (int)dir.y + 9, 16, COR_CLARA);
     for (int i = 0; i < 4; i++) {
         int y = (int)dir.y + 34 + i * 27;
-        DrawText(EXPRESSOES[i], (int)dir.x + 16, y, 20, (Color){ 255, 214, 251, 255 });
+        UiDrawText(EXPRESSOES[i], (int)dir.x + 16, y, 20, (Color){ 255, 214, 251, 255 });
         const char *res = RESULTADOS[i] ? "Verdadeiro" : "Falso";
         Color cor = RESULTADOS[i] ? (Color){ 126, 240, 138, 255 } : (Color){ 255, 157, 181, 255 };
-        DrawText(res, (int)(dir.x + dir.width - 16 - MeasureText(res, 18)), y + 1, 18, cor);
+        UiDrawText(res, (int)(dir.x + dir.width - 16 - UiMeasureText(res, 18)), y + 1, 18, cor);
     }
 
     // primeiro passo da IA, depois que a ajuda foi aceita
@@ -405,7 +406,7 @@ static void DesenharLogica(void)
         Rectangle r = { 140, 562, 1000, 30 };
         DrawRectangleRounded(r, 0.4f, 8, Fade(COR_CLARA, 0.9f));
         DrawCircle((int)r.x + 16, (int)r.y + 15, 6, COR_VERDE);
-        DrawText("IA: p ^ q é verdadeira, então p e q também são: o Fragmento C vem antes do A, e o D vem antes do B. O resto é com você.",
+        UiDrawText("IA: p ^ q é verdadeira, então p e q também são: o Fragmento C vem antes do A, e o D vem antes do B. O resto é com você.",
                  (int)r.x + 30, (int)r.y + 7, 15, COR_MARINHO);
     }
 }
@@ -430,12 +431,12 @@ void Senha_Desenhar(void)
         DrawRectangleLinesEx(POPUP, 2.0f, COR_AZUL);
         DrawRectangleGradientH((int)POPUP.x, (int)POPUP.y, (int)POPUP.width, 34, COR_AZUL, COR_MARINHO);
         DrawCircle((int)POPUP.x + 20, (int)POPUP.y + 17, 7, COR_VERDE);
-        DrawText("IA (online)", (int)POPUP.x + 35, (int)POPUP.y + 8, 20, COR_CLARA);
+        UiDrawText("IA (online)", (int)POPUP.x + 35, (int)POPUP.y + 8, 20, COR_CLARA);
 
-        DrawText("IA diz:", (int)POPUP.x + 25, (int)POPUP.y + 55, 18, COR_AZUL);
-        DrawText("Cinco tentativas erradas. Posso fazer o primeiro",
+        UiDrawText("IA diz:", (int)POPUP.x + 25, (int)POPUP.y + 55, 18, COR_AZUL);
+        UiDrawText("Cinco tentativas erradas. Posso fazer o primeiro",
                  (int)POPUP.x + 25, (int)POPUP.y + 80, 20, COR_MARINHO);
-        DrawText("passo da dedução com você ou você tenta de novo.",
+        UiDrawText("passo da dedução com você ou você tenta de novo.",
                  (int)POPUP.x + 25, (int)POPUP.y + 105, 20, COR_MARINHO);
 
         Botao(BOTAO_1, "1. Fazer o primeiro passo (-1 token)", true);

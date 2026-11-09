@@ -17,6 +17,7 @@
 #include "audio_manager.h"
 
 #include "raylib.h"
+#include "ui.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <math.h>
@@ -205,7 +206,7 @@ static ResultadoCorrida AtualizarJogo(Jogo *partida, float tempoQuadro)
 /* Escreve um texto centralizado na largura do minigame */
 static void TextoCentral(const char *texto, int y, int tamanho, Color cor)
 {
-    DrawText(texto, (LARGURA - MeasureText(texto, tamanho)) / 2, y, tamanho, cor);
+    UiDrawText(texto, (LARGURA - UiMeasureText(texto, tamanho)) / 2, y, tamanho, cor);
 }
 
 /* Desenha o fundo e o chao, que "anda" conforme o deslocamento */
@@ -241,10 +242,10 @@ static void DesenharObjetos(const Jogo *partida)
 /* Desenha os pontos (esquerda) e o recorde (direita) */
 static void DesenharHud(const Jogo *partida, int melhor)
 {
-    DrawText(TextFormat("Pontos: %d", (int)partida->pontos), 44, 16, 24, RAYWHITE);
+    UiDrawText(TextFormat("Pontos: %d", (int)partida->pontos), 44, 16, 24, RAYWHITE);
 
     const char *textoRecorde = TextFormat("Recorde: %d", melhor);
-    DrawText(textoRecorde, LARGURA - MeasureText(textoRecorde, 24) - 20, 16, 24, GOLD);
+    UiDrawText(textoRecorde, LARGURA - UiMeasureText(textoRecorde, 24) - 20, 16, 24, GOLD);
 }
 
 /* Tela de fim de jogo: pontos, recorde e opcoes */
