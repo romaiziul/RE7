@@ -66,6 +66,9 @@ void LoadAssets(Assets *assets)
     assets->amigo[0] = LoadTexture("assets/comum/amigo_neutro.png");
     assets->amigo[1] = LoadTexture("assets/comum/amigo_feliz.png");
 
+    assets->amigoSurpreso[0] = LoadTexture("assets/comum/amigo_surpreso_esquerda.png");
+    assets->amigoSurpreso[1] = LoadTexture("assets/comum/amigo_surpreso_direita.png");
+
 
     // ATO 1 E ATO 2
 
@@ -92,6 +95,7 @@ void UnloadAssets(Assets *assets)
     for (int i = 0; i < 3; i++) UnloadTexture(assets->lia26[i]);
     for (int i = 0; i < 7; i++) UnloadTexture(assets->lia07[i]);
     for (int i = 0; i < 2; i++) UnloadTexture(assets->amigo[i]);
+    for (int i = 0; i < 2; i++) UnloadTexture(assets->amigoSurpreso[i]);
 
     UnloadTexture(assets->cgTela2026);
     UnloadTexture(assets->bgCorredor);
@@ -101,4 +105,4 @@ void UnloadAssets(Assets *assets)
     UnloadTexture(assets->cgEnsaio);
     UnloadTexture(assets->logo);
     UnloadTexture(assets->iaStar);
-}
+}

@@ -124,6 +124,46 @@ static bool LoadGame(GameState *game)
 
 #define FLASH_DURACAO 1.4f
 
+// Fade para preto (transicao lenta entre cenas)
+typedef enum
+{
+    FADE_NENHUM,
+    FADE_ESCURECENDO,       // a tela vai ficando preta; no fim troca de cena
+    FADE_CLAREANDO          // a tela volta a aparecer
+} FadeFase;
+
+#define FADE_SAIDA_ENCONTRO     1.8f    // escurece depois da fala "Ufa, consegui alcançá-lo!"
+#define FADE_TRANSICAO          1.2f    // escurece entre uma cena e outra do Ato 2
+#define FADE_ENTRADA_LANHOUSE   1.4f    // a nova cena clareia
+#define FADE_ENTRADA_ENCONTRO   0.5f    // o encontro aparece depois da corrida
+#define ENCONTRO_VIRA_SEGUNDOS  1.1f    // quanto tempo o amigo demora para virar e olhar para a Lia
+
+static FadeFase fadeFase = FADE_NENHUM;
+static float fadeTempo = 0.0f;
+static float fadeDuracao = 1.0f;
+static SceneID fadeDestino = SCENE_PRESENT;
+static float encontroTempo = 0.0f;          // tempo desde que o encontro comecou
+
+static void IniciarFade(FadeFase fase, float duracao, SceneID destino)
+{
+    fadeFase = fase;
+    fadeTempo = 0.0f;
+    fadeDuracao = duracao;
+    fadeDestino = destino;
+}
+
+static void DesenharFade(void)
+{
+    if (fadeFase == FADE_NENHUM) return;
+
+    float t = fadeTempo / fadeDuracao;
+    if (t > 1.0f) t = 1.0f;
+
+    float alfa = (fadeFase == FADE_ESCURECENDO) ? t : 1.0f - t;
+
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alfa));
+}
+
 // Tempo restante do flash (0 = sem flash)
 static float flashTimer = 0.0f;
 
@@ -311,6 +351,9 @@ static void AtualizarMusica(GameState *game)
 
                 case SCENE_ATO2_CG_ESCREVEM:
                 case SCENE_ATO2_CG_PROFESSORA:
+                case SCENE_ATO2_CG_PROFESSORA_SEM_IA:
+                case SCENE_ATO2_CG_CASA_NOITE:
+                case SCENE_ATO2_CG_FRENTE_ESCOLA:
                 case SCENE_ATO2_CG_ENSAIO:
                     AudioManager_PlayMusic(MUSICA_VITORIA);
                     break;
@@ -346,7 +389,9 @@ typedef enum
     FUNDO_CG_TELA,
     FUNDO_CG_ESCREVEM,
     FUNDO_CG_PROFESSORA,
-    FUNDO_CG_ENSAIO
+    FUNDO_CG_ENSAIO,
+    FUNDO_PROVISORIO_CASA,      // imagem provisoria desenhada pelo jogo
+    FUNDO_PROVISORIO_ESCOLA     // imagem provisoria desenhada pelo jogo
 } FundoId;
 
 typedef struct
@@ -368,19 +413,30 @@ static VisualCena VisualDaCena(SceneID id)
         case SCENE_ATO1_IA_B:
         case SCENE_ATO2_QUARTO:         return (VisualCena){ FUNDO_2007,           2007, false };
 
+        // corredor: o Joao aparece na cena 2 e no resultado 2.1 (nao no 2.2)
         case SCENE_ATO2_CORREDOR:
-        case SCENE_ATO2_POSTER:         return (VisualCena){ FUNDO_CORREDOR,       2007, true  };
+        case SCENE_ATO2_DETERMINADA:
+        case SCENE_ATO2_ENCONTRO:
+        case SCENE_ATO2_RES21:          return (VisualCena){ FUNDO_CORREDOR,       2007, true  };
 
+        case SCENE_ATO2_RES22:          return (VisualCena){ FUNDO_CORREDOR,       2007, false };
+
+        // lan house: o Joao esta ao lado da Lia (na cena 3.2 ele entra durante a cena)
         case SCENE_ATO2_LANHOUSE:
+        case SCENE_ATO2_LANHOUSE_SEM:
         case SCENE_ATO2_IA_ESCREVE:
         case SCENE_ATO2_UMA_IDEIA:
-        case SCENE_ATO2_FECHAR:         return (VisualCena){ FUNDO_LANHOUSE,       2007, false };
+        case SCENE_ATO2_COM_JOAO:
+        case SCENE_ATO2_C4:
+        case SCENE_ATO2_C4_ZERO:        return (VisualCena){ FUNDO_LANHOUSE,       2007, true  };
 
-        case SCENE_ATO2_DISCURSO:
-        case SCENE_ATO2_ENSAIO:         return (VisualCena){ FUNDO_LANHOUSE,       2007, true  };
+        case SCENE_ATO2_CG_CASA_NOITE:  return (VisualCena){ FUNDO_PROVISORIO_CASA,   0, false };
+        case SCENE_ATO2_CG_FRENTE_ESCOLA: return (VisualCena){ FUNDO_PROVISORIO_ESCOLA, 0, false };
 
         case SCENE_ATO2_CG_ESCREVEM:    return (VisualCena){ FUNDO_CG_ESCREVEM,    0,    false };
-        case SCENE_ATO2_CG_PROFESSORA:  return (VisualCena){ FUNDO_CG_PROFESSORA,  0,    false };
+        case SCENE_ATO2_CG_PROFESSORA:
+        case SCENE_ATO2_CG_PROFESSORA_SEM_IA:
+                                        return (VisualCena){ FUNDO_CG_PROFESSORA,  0,    false };
         case SCENE_ATO2_CG_ENSAIO:      return (VisualCena){ FUNDO_CG_ENSAIO,      0,    false };
 
         case SCENE_EPILOGUE:            return (VisualCena){ FUNDO_2026,           2026, false };
@@ -439,6 +495,84 @@ static void DesenharImagemTela(Texture2D tex)
 }
 
 // Cenario provisorio da lan house (a arte definitiva ainda sera feita)
+// ---------------------------------------------------------------
+// IMAGENS PROVISORIAS (ainda nao ha arte): desenhadas aqui com formas.
+// Quando a arte existir, troque por DesenharImagemTela(textura).
+// ---------------------------------------------------------------
+
+static void DesenharAvisoProvisorio(const char *descricao)
+{
+    DrawRectangleRounded((Rectangle){ 340, 40, 600, 86 }, 0.3f, 8, Fade(BLACK, 0.55f));
+    DrawCenteredText("IMAGEM PROVISÓRIA", 52, 22, (Color){ 255, 105, 200, 255 });
+    DrawCenteredText(descricao, 84, 26, WHITE);
+}
+
+// Quarto da Lia de noite: janela com lua, mesa com lampada e a Lia curvada sobre o papel
+static void DesenharProvisorioCasa(void)
+{
+    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 12, 16, 44, 255 }, (Color){ 40, 30, 80, 255 });
+
+    // janela com lua e estrelas
+    Rectangle janela = { 180, 150, 360, 280 };
+    DrawRectangleRec(janela, (Color){ 8, 12, 36, 255 });
+    DrawCircle(430, 240, 40, (Color){ 250, 245, 215, 255 });
+    DrawCircle(448, 232, 36, (Color){ 8, 12, 36, 255 });
+    for (int i = 0; i < 9; i++)
+        DrawCircle((int)janela.x + 30 + (i * 83) % 300, (int)janela.y + 30 + (i * 47) % 200, 2, WHITE);
+    DrawRectangleLinesEx(janela, 8, (Color){ 90, 70, 120, 255 });
+    DrawLine((int)(janela.x + janela.width / 2), (int)janela.y, (int)(janela.x + janela.width / 2), (int)(janela.y + janela.height), (Color){ 90, 70, 120, 255 });
+
+    // chao e mesa
+    DrawRectangle(0, 560, 1280, 160, (Color){ 30, 22, 52, 255 });
+    DrawRectangle(620, 400, 520, 30, (Color){ 96, 64, 50, 255 });
+    DrawRectangle(650, 430, 24, 150, (Color){ 76, 50, 40, 255 });
+    DrawRectangle(1086, 430, 24, 150, (Color){ 76, 50, 40, 255 });
+
+    // luz da lampada
+    BrilhoSuave(930, 330, 300, (Color){ 255, 220, 140, 255 }, 0.35f);
+    DrawRectangle(924, 330, 8, 70, (Color){ 60, 60, 70, 255 });
+    DrawTriangle((Vector2){ 928, 290 }, (Vector2){ 880, 335 }, (Vector2){ 976, 335 }, (Color){ 255, 200, 90, 255 });
+
+    // papel e Lia (silhueta)
+    DrawRectangle(780, 385, 90, 16, (Color){ 245, 240, 225, 255 });
+    DrawCircle(760, 330, 34, (Color){ 120, 80, 70, 255 });
+    DrawRectangle(725, 360, 70, 55, (Color){ 255, 105, 200, 255 });
+}
+
+// Frente da escola de dia: ceu, predio, porta e alguns estudantes
+static void DesenharProvisorioEscola(void)
+{
+    DrawRectangleGradientV(0, 0, 1280, 720, (Color){ 120, 190, 250, 255 }, (Color){ 220, 240, 255, 255 });
+    DrawCircle(1100, 130, 60, (Color){ 255, 236, 150, 255 });
+
+    // predio
+    DrawRectangle(240, 190, 800, 380, (Color){ 214, 120, 96, 255 });
+    DrawRectangle(240, 170, 800, 30, (Color){ 150, 80, 70, 255 });
+
+    for (int linha = 0; linha < 2; linha++)
+        for (int col = 0; col < 6; col++)
+            DrawRectangle(290 + col * 125, 230 + linha * 130, 80, 80, (Color){ 170, 215, 245, 255 });
+
+    // porta
+    DrawRectangle(590, 440, 100, 130, (Color){ 90, 60, 50, 255 });
+    DrawText("ESCOLA", 560, 396, 36, WHITE);
+
+    // chao
+    DrawRectangle(0, 570, 1280, 150, (Color){ 150, 150, 160, 255 });
+
+    // estudantes (bonecos simples)
+    Color cores[] = { (Color){ 255, 105, 200, 255 }, (Color){ 39, 172, 234, 255 }, (Color){ 76, 175, 80, 255 }, (Color){ 255, 193, 7, 255 } };
+
+    for (int i = 0; i < 7; i++)
+    {
+        int x = 130 + i * 160;
+        int y = 580 + (i % 2) * 40;
+
+        DrawCircle(x, y, 18, (Color){ 120, 85, 70, 255 });
+        DrawRectangle(x - 20, y + 18, 40, 60, cores[i % 4]);
+    }
+}
+
 static void DesenharLanHouse(void)
 {
     float tempo = (float)GetTime();
@@ -566,6 +700,12 @@ static void DesenharEscolha(GameState *game)
     }
 }
 
+// Cena 4: barra em 0 (a IA escreveu) ou em 1 a 3. Vale com ou sem a corrida.
+static SceneID ProximaCena4(void)
+{
+    return (Tokens_Valor() == 0) ? SCENE_ATO2_C4_ZERO : SCENE_ATO2_C4;
+}
+
 // Aplica o efeito da opcao escolhida
 static void ResolverEscolha(GameState *game, int opcao)
 {
@@ -586,16 +726,15 @@ static void ResolverEscolha(GameState *game, int opcao)
             break;
 
         case ESCOLHA_AMIGO:
-            if (opcao == 0)                         // dar uma chance ao amigo
+            game->choice = ESCOLHA_NENHUMA;
+
+            if (opcao == 0)                         // tentar alcancar o Joao: corrida
             {
-                game->choice = ESCOLHA_NENHUMA;
-                ChangeScene(game, SCENE_ATO2_POSTER);
+                IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, SCENE_ATO2_DETERMINADA);
             }
-            else                                    // ignorar: o amigo alcanca e a escolha volta
+            else                                    // nao preciso de amigos: pula a corrida
             {
-                escolhaErro = 0.5f;
-                escolhaErroOpcao = opcao;
-                return;
+                IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, SCENE_ATO2_RES22);
             }
             break;
 
@@ -612,10 +751,10 @@ static void ResolverEscolha(GameState *game, int opcao)
                 Tokens_Gastar();
                 ChangeScene(game, SCENE_ATO2_UMA_IDEIA);
             }
-            else                                    // fechar a janela: +1
+            else                                    // fazer com a ajuda do Joao: +1
             {
                 Tokens_Recuperar();
-                ChangeScene(game, SCENE_ATO2_FECHAR);
+                ChangeScene(game, SCENE_ATO2_COM_JOAO);
             }
             break;
 
@@ -681,7 +820,7 @@ static void FimDaCena(GameState *game, Scene scene)
             escolhaErro = 0.0f;
             return;
 
-        case SCENE_ATO2_POSTER:
+        case SCENE_ATO2_DETERMINADA:
             // Desafio 2: corrida de obstaculos.
             game->dialogueIndex = scene.dialogueCount - 1;
             SaveGame(game);
@@ -689,10 +828,48 @@ static void FimDaCena(GameState *game, Scene scene)
             game->currentScreen = SCREEN_CORRIDA;
             return;
 
+        case SCENE_ATO2_ENCONTRO:
+            // depois da fala: a tela escurece devagar e o corredor clareia sozinho
+            game->dialogueIndex = scene.dialogueCount - 1;
+            IniciarFade(FADE_ESCURECENDO, FADE_SAIDA_ENCONTRO, scene.nextScene);
+            return;
+
         case SCENE_ATO2_LANHOUSE:
+        case SCENE_ATO2_LANHOUSE_SEM:
+            // escolha 2 (pop-up do MSN)
             game->dialogueIndex = scene.dialogueCount - 1;
             game->choice = ESCOLHA_IA;
             escolhaErro = 0.0f;
+            return;
+
+        case SCENE_ATO2_IA_ESCREVE:
+        case SCENE_ATO2_UMA_IDEIA:
+        case SCENE_ATO2_COM_JOAO:
+            // cena 4: a versao depende da escolha 1 (Joao) e da barra (0 ou 1 a 3)
+            game->dialogueIndex = scene.dialogueCount - 1;
+            IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, ProximaCena4());
+            return;
+
+        // transicoes com fade para preto entre uma cena e outra
+        case SCENE_ATO2_QUARTO:
+        case SCENE_ATO2_RES21:
+        case SCENE_ATO2_RES22:
+        case SCENE_ATO2_C4:
+        case SCENE_ATO2_C4_ZERO:
+        case SCENE_ATO2_CG_ESCREVEM:
+        case SCENE_ATO2_CG_CASA_NOITE:
+        case SCENE_ATO2_CG_ENSAIO:
+            game->dialogueIndex = scene.dialogueCount - 1;
+            IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, scene.nextScene);
+            return;
+
+        case SCENE_ATO2_CG_FRENTE_ESCOLA:
+            // barra em 0: a professora sem a IA; barra em 1 a 3: com "Etapa concluida"
+            game->dialogueIndex = scene.dialogueCount - 1;
+            IniciarFade(
+                FADE_ESCURECENDO, FADE_TRANSICAO,
+                (Tokens_Valor() == 0) ? SCENE_ATO2_CG_PROFESSORA_SEM_IA : SCENE_ATO2_CG_PROFESSORA
+            );
             return;
 
         case SCENE_EPILOGUE:
@@ -748,6 +925,8 @@ void InitGame(GameState *game)
 
     game->senhaNoQuarto = false;
 
+    fadeFase = FADE_NENHUM;
+
     Tokens_Reiniciar();
     BarraTokens_Reiniciar();
     Senha_ComecarJogo();
@@ -781,6 +960,7 @@ static void ComecarNovoJogo(GameState *game)
     ChangeScene(game, SCENE_PRESENT);
 
     flashTimer = 0.0f;
+    fadeFase = FADE_NENHUM;
 
     game->choice = 0;
     game->senhaNoQuarto = false;
@@ -1033,7 +1213,9 @@ void UpdateGame(GameState *game)
         else if (resultado == MINIGAME_VENCEU)      // chegou ao fim do corredor
         {
             game->currentScreen = SCREEN_GAME;
-            ChangeScene(game, SCENE_ATO2_LANHOUSE);
+            ChangeScene(game, SCENE_ATO2_ENCONTRO);
+            encontroTempo = 0.0f;
+            IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_ENCONTRO, SCENE_ATO2_ENCONTRO);
             SaveGame(game);
         }
 
@@ -1077,9 +1259,37 @@ void UpdateGame(GameState *game)
         {
             SaveGame(game);
 
+            fadeFase = FADE_NENHUM;
+
             game->currentScreen = SCREEN_MENU;
 
             return;
+        }
+
+        // Tempo do encontro (o amigo vira para olhar a Lia)
+        if (game->currentScene == SCENE_ATO2_ENCONTRO)
+            encontroTempo += GetFrameTime();
+        else
+            encontroTempo = 0.0f;
+
+        // Fade para preto: enquanto escurece, nada responde; no fim troca de cena
+        if (fadeFase != FADE_NENHUM)
+        {
+            fadeTempo += GetFrameTime();
+
+            if (fadeFase == FADE_ESCURECENDO && fadeTempo >= fadeDuracao)
+            {
+                ChangeScene(game, fadeDestino);
+                SaveGame(game);
+
+                IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_LANHOUSE, fadeDestino);
+            }
+            else if (fadeFase == FADE_CLAREANDO && fadeTempo >= fadeDuracao)
+            {
+                fadeFase = FADE_NENHUM;
+            }
+
+            if (fadeFase == FADE_ESCURECENDO) return;
         }
 
         // Enquanto ha uma escolha na tela, so as opcoes respondem
@@ -1380,19 +1590,40 @@ void DrawGame(
             case FUNDO_CG_ESCREVEM:   DesenharImagemTela(assets->cgEscrevem);    break;
             case FUNDO_CG_PROFESSORA: DesenharImagemTela(assets->cgProfessora);  break;
             case FUNDO_CG_ENSAIO:     DesenharImagemTela(assets->cgEnsaio);      break;
+            case FUNDO_PROVISORIO_CASA:
+                DesenharProvisorioCasa();
+                DesenharAvisoProvisorio("Lia treinando o discurso em casa, à noite");
+                break;
+            case FUNDO_PROVISORIO_ESCOLA:
+                DesenharProvisorioEscola();
+                DesenharAvisoProvisorio("Frente da escola, de dia");
+                break;
         }
+
+        // Escolha 1 (corrida): ainda sem arte da Lia determinada
+        if (game->currentScene == SCENE_ATO2_DETERMINADA)
+            DesenharAvisoProvisorio("Imagem da Lia determinada (falta a arte)");
 
         // Personagens: o amigo a esquerda, a Lia a direita
         // (altura, posicao Y do topo, borda direita)
 
-        if (visual.amigo)
-        {
-            Pose poseAmigo = PoseDe(&scene, game->dialogueIndex, "Amigo");
+        // Na cena 3.2 (lan house sem o Joao) ele so entra na segunda fala
+        bool mostrarAmigo = visual.amigo;
 
-            DrawPersonagem(
-                assets->amigo[poseAmigo == POSE_FELIZ ? 1 : 0],
-                900.0f, -101.0f, 610.0f
-            );
+        if (game->currentScene == SCENE_ATO2_LANHOUSE_SEM && game->dialogueIndex < 1)
+            mostrarAmigo = false;
+
+        if (mostrarAmigo)
+        {
+            Pose poseAmigo = PoseDe(&scene, game->dialogueIndex, "João");
+
+            Texture2D texAmigo = assets->amigo[poseAmigo == POSE_FELIZ ? 1 : 0];
+
+            // Encontro: primeiro ele olha para o outro lado, depois vira e olha para a Lia
+            if (game->currentScene == SCENE_ATO2_ENCONTRO)
+                texAmigo = assets->amigoSurpreso[encontroTempo < ENCONTRO_VIRA_SEGUNDOS ? 0 : 1];
+
+            DrawPersonagem(texAmigo, 900.0f, -101.0f, 610.0f);
         }
 
         if (visual.lia != 0)
@@ -1405,27 +1636,6 @@ void DrawGame(
                 DrawPersonagem(texLia, 900.0f, -101.0f, 1250.0f);
             else
                 DrawPersonagem(texLia, 820.0f, -7.0f, 1250.0f);
-        }
-
-        // Poster do concurso (Ato 2): aparece enquanto o amigo fala dele
-        if (game->currentScene == SCENE_ATO2_POSTER && game->dialogueIndex <= 1)
-        {
-            float altura = 400.0f;
-            float largura = altura * (float)assets->poster.width / (float)assets->poster.height;
-            Rectangle area = { (1280.0f - largura) / 2.0f, 60.0f, largura, altura };
-
-            float pulso = 0.5f + 0.5f * sinf((float)GetTime() * 4.0f);
-
-            DrawRectangleRounded(
-                (Rectangle){ area.x - 8, area.y - 8, area.width + 16, area.height + 16 },
-                0.04f, 8, Fade((Color){ 255, 105, 200, 255 }, 0.35f + 0.4f * pulso)
-            );
-
-            DrawTexturePro(
-                assets->poster,
-                (Rectangle){ 0, 0, (float)assets->poster.width, (float)assets->poster.height },
-                area, (Vector2){ 0, 0 }, 0.0f, WHITE
-            );
         }
 
         // ---------------------------------------------
@@ -1488,6 +1698,9 @@ void DrawGame(
         // ---------------------------------------------
 
         DesenharFlash();
+
+        // Fade para preto (por cima de tudo, menos do aviso de som)
+        DesenharFade();
 
         // Exibe o aviso de som por cima da tela atual
         DesenharAvisoSom();

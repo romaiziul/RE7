@@ -44,6 +44,9 @@ typedef struct
     // amigo: 0 neutro, 1 feliz
     Texture2D amigo[2];
 
+    // amigo surpreso (encontro depois da corrida): 0 olhando para a esquerda, 1 olhando para a direita
+    Texture2D amigoSurpreso[2];
+
 
     // Ato 1 e Ato 2: cenarios e imagens de cena
 
@@ -62,4 +65,4 @@ void LoadAssets(Assets *assets);
 void UnloadAssets(Assets *assets);
 
 
-#endif
+#endif
