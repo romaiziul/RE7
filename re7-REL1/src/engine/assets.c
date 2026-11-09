@@ -46,7 +46,7 @@ void LoadAssets(Assets *assets)
         "assets/comum/lia26_decidida.png"
     };
 
-    static const char *lia07Paths[7] =
+    static const char *lia07Paths[11] =
     {
         "assets/comum/lia07_neutra.png",
         "assets/comum/lia07_confusa.png",
@@ -54,11 +54,15 @@ void LoadAssets(Assets *assets)
         "assets/comum/lia07_surpresa.png",
         "assets/comum/lia07_contrariada.png",
         "assets/comum/lia07_nostalgica.png",
-        "assets/comum/lia07_rindo.png"
+        "assets/comum/lia07_rindo.png",
+        "assets/comum/lia07_feliz.png",
+        "assets/comum/lia07_triste.png",
+        "assets/comum/lia07_pensativa.png",
+        "assets/comum/lia07_determinada.png"
     };
 
     for (int i = 0; i < 3; i++) assets->lia26[i] = LoadTexture(lia26Paths[i]);
-    for (int i = 0; i < 7; i++) assets->lia07[i] = LoadTexture(lia07Paths[i]);
+    for (int i = 0; i < 11; i++) assets->lia07[i] = LoadTexture(lia07Paths[i]);
 
     assets->liaFrente = assets->lia26[0];
     assets->liaJovemLado = assets->lia07[0];
@@ -75,10 +79,16 @@ void LoadAssets(Assets *assets)
     assets->cgTela2026 = LoadTexture("assets/ato1/ato1_cg_tela2026.png");
 
     assets->bgCorredor = LoadTexture("assets/ato2/ato2_corredor.png");
+    assets->bgLanhouse = LoadTexture("assets/ato2/ato2_lanhouse.png");
     assets->poster = LoadTexture("assets/ato2/ato2_poster.png");
     assets->cgEscrevem = LoadTexture("assets/ato2/ato2_cg_escrevem.png");
     assets->cgProfessora = LoadTexture("assets/ato2/ato2_cg_professora.png");
     assets->cgEnsaio = LoadTexture("assets/ato2/ato2_cg_ensaio.png");
+    assets->cgCasaNoite = LoadTexture("assets/ato2/ato2_cg_casa_noite.png");
+    assets->cgFrenteEscola = LoadTexture("assets/ato2/ato2_cg_frente_escola.png");
+    assets->pcBoot = LoadTexture("assets/ato2/ato2_doors_boot.png");
+    assets->pcDesktop = LoadTexture("assets/ato2/ato2_doors_xp.png");
+    assets->pcPerfil = LoadTexture("assets/ato2/ato2_cg_perfil.png");
 }
 
 
@@ -93,16 +103,22 @@ void UnloadAssets(Assets *assets)
             UnloadTexture(assets->menuButtons[i][j]);
 
     for (int i = 0; i < 3; i++) UnloadTexture(assets->lia26[i]);
-    for (int i = 0; i < 7; i++) UnloadTexture(assets->lia07[i]);
+    for (int i = 0; i < 11; i++) UnloadTexture(assets->lia07[i]);
     for (int i = 0; i < 2; i++) UnloadTexture(assets->amigo[i]);
     for (int i = 0; i < 2; i++) UnloadTexture(assets->amigoSurpreso[i]);
 
     UnloadTexture(assets->cgTela2026);
     UnloadTexture(assets->bgCorredor);
+    UnloadTexture(assets->bgLanhouse);
     UnloadTexture(assets->poster);
     UnloadTexture(assets->cgEscrevem);
     UnloadTexture(assets->cgProfessora);
     UnloadTexture(assets->cgEnsaio);
+    UnloadTexture(assets->cgCasaNoite);
+    UnloadTexture(assets->cgFrenteEscola);
+    UnloadTexture(assets->pcBoot);
+    UnloadTexture(assets->pcDesktop);
+    UnloadTexture(assets->pcPerfil);
     UnloadTexture(assets->logo);
     UnloadTexture(assets->iaStar);
 }
