@@ -3,52 +3,54 @@
 
 #include "scenes.h"
 
-// Cena 1: quarto em 2007
+// Falas do Ato 2. Cada cena tem a lista de falas e a quantidade.
 extern Dialogue ato2QuartoDialogues[];
 int GetAto2QuartoCount(void);
-
-// Cena 2: corredor (antes da escolha 1)
 extern Dialogue ato2CorredorDialogues[];
 int GetAto2CorredorCount(void);
-
-// Cena 2: depois da escolha 1 (poster e convite para a lan house)
-extern Dialogue ato2PosterDialogues[];
-int GetAto2PosterCount(void);
-
-// Cena 3: lan house (antes da escolha 2)
+extern Dialogue ato2DeterminadaDialogues[];
+int GetAto2DeterminadaCount(void);
+extern Dialogue ato2EncontroDialogues[];
+int GetAto2EncontroCount(void);
+extern Dialogue ato2Res21Dialogues[];
+int GetAto2Res21Count(void);
+extern Dialogue ato2Res22Dialogues[];
+int GetAto2Res22Count(void);
 extern Dialogue ato2LanhouseDialogues[];
 int GetAto2LanhouseCount(void);
-
-// Cena 3: resposta de cada opcao da escolha 2
-extern Dialogue ato2IAEscreveDialogues[];     // zera a barra
+extern Dialogue ato2LanhouseSemDialogues[];
+int GetAto2LanhouseSemCount(void);
+extern Dialogue ato2IAEscreveDialogues[];
 int GetAto2IAEscreveCount(void);
-extern Dialogue ato2UmaIdeiaDialogues[];      // -1 token
+extern Dialogue ato2UmaIdeiaDialogues[];
 int GetAto2UmaIdeiaCount(void);
-extern Dialogue ato2FecharJanelaDialogues[];  // +1 token (maximo 3)
-int GetAto2FecharJanelaCount(void);
-
-// Cena 4: discurso (barra em 1, 2 ou 3)
-extern Dialogue ato2DiscursoDialogues[];
-int GetAto2DiscursoCount(void);
+extern Dialogue ato2ComJoaoDialogues[];
+int GetAto2ComJoaoCount(void);
+extern Dialogue ato2C4Dialogues[];
+int GetAto2C4Count(void);
+extern Dialogue ato2C4ZeroDialogues[];
+int GetAto2C4ZeroCount(void);
 extern Dialogue ato2CgEscrevemDialogues[];
 int GetAto2CgEscrevemCount(void);
-extern Dialogue ato2CgProfessoraDialogues[];
-int GetAto2CgProfessoraCount(void);
-
-// Cena 4: ensaio (barra em 0, a IA escreveu o discurso)
-extern Dialogue ato2EnsaioDialogues[];
-int GetAto2EnsaioCount(void);
 extern Dialogue ato2CgEnsaioDialogues[];
 int GetAto2CgEnsaioCount(void);
+extern Dialogue ato2CgCasaNoiteDialogues[];
+int GetAto2CgCasaNoiteCount(void);
+extern Dialogue ato2CgFrenteEscolaDialogues[];
+int GetAto2CgFrenteEscolaCount(void);
+extern Dialogue ato2CgProfessoraDialogues[];
+int GetAto2CgProfessoraCount(void);
+extern Dialogue ato2CgProfessoraSemIADialogues[];
+int GetAto2CgProfessoraSemIACount(void);
 
 // Textos das escolhas
 #define ATO2_ESCOLHA1_PERGUNTA "O que você faz?"
-#define ATO2_ESCOLHA1_A "Dar uma chance ao amigo"
-#define ATO2_ESCOLHA1_B "Ignorar e seguir"
+#define ATO2_ESCOLHA1_A "Tentar alcançar o João"
+#define ATO2_ESCOLHA1_B "Não preciso de amigos, a IA é o suficiente."
 
 #define ATO2_ESCOLHA2_PERGUNTA "O que você responde à IA?"
 #define ATO2_ESCOLHA2_A "IA escreve o discurso"
 #define ATO2_ESCOLHA2_B "Só uma ideia de abertura"
-#define ATO2_ESCOLHA2_C "Fechar a janela"
+#define ATO2_ESCOLHA2_C "Fazer com a ajuda do João"
 
 #endif

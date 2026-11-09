@@ -28,6 +28,8 @@ void AudioManager_Close(void);
 
 void AudioManager_Play(EfeitoSonoro efeito);
 void AudioManager_PlayMusic(const char *caminho);
+// Igual ao PlayMusic, mas comeca a faixa em segundoInicial (pula silencio no comeco)
+void AudioManager_PlayMusicFrom(const char *caminho, float segundoInicial);
 void AudioManager_StopMusic(void);
 void AudioManager_Update(void);
 

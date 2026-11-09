@@ -82,7 +82,7 @@ void AudioManager_StopMusic(void)
     musicaAtual[0] = '\0';
 }
 
-void AudioManager_PlayMusic(const char *caminho)
+void AudioManager_PlayMusicFrom(const char *caminho, float segundoInicial)
 {
     if (!inicializado || caminho == NULL) return;
     if (strcmp(musicaAtual, caminho) == 0) return;
@@ -107,6 +107,15 @@ void AudioManager_PlayMusic(const char *caminho)
     musicaCarregada = true;
     AplicarVolumeMusica();
     PlayMusicStream(musica);
+
+    // Pula o comeco da faixa (ex.: silencio inicial)
+    if (segundoInicial > 0.0f)
+        SeekMusicStream(musica, segundoInicial);
+}
+
+void AudioManager_PlayMusic(const char *caminho)
+{
+    AudioManager_PlayMusicFrom(caminho, 0.0f);
 }
 
 void AudioManager_Update(void)
