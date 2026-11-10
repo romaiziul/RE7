@@ -1,9 +1,11 @@
 // barra_tokens.c
-// Barra de tokens da IA: painel de vidro, avatar redondo da IA com status
-// do MSN e UMA bateria dividida em 3 partes, como a de um celular.
+// Barra de tokens da IA, sem caixa de fundo: avatar redondo rosa com o simbolo
+// da IA (assets/comum/iaStar.png, o mesmo da caixa de falas), status do MSN,
+// UMA bateria dividida em 3 partes, como a de um celular, e textos claros com
+// contorno escuro fino, para ler tanto em cenas escuras quanto claras.
 //
 // Cores da bateria:
-// - tokens normais: azul;
+// - tokens normais: degrade do rosa (em cima) para o azul (embaixo);
 // - token de reserva (Ato 3): vermelho;
 // - partes vazias e barra em 0: cinza (com 0, o status vira "offline").
 //
@@ -26,7 +28,34 @@
 #define COR_VERDE    (Color){  76, 175,  80, 255 }
 #define COR_CINZA    (Color){ 150, 156, 170, 255 }
 
+#define COR_ROSA_CLARO (Color){ 250, 233, 247, 255 }  // fundo da bateria
+#define COR_AVATAR_CENTRO (Color){ 255, 175, 235, 255 }  // fundo do avatar: rosa claro no centro
+#define COR_AVATAR_BORDA  (Color){ 240, 125, 222, 255 }  // e um pouco mais forte na borda
+
 #define DURACAO_ANIM 0.6f
+
+// Simbolo da IA. Carregado no primeiro desenho (precisa da janela aberta).
+static Texture2D simboloIA;
+static bool simboloCarregado = false;
+
+static void CarregarSimbolo(void)
+{
+    if (simboloCarregado) return;
+    simboloCarregado = true;
+    simboloIA = LoadTexture("assets/comum/iaStar.png");
+    if (simboloIA.id != 0) {
+        // a imagem tem 256 px e aparece com 38 px: os mipmaps evitam que o anel fique serrilhado
+        GenTextureMipmaps(&simboloIA);
+        SetTextureFilter(simboloIA, TEXTURE_FILTER_TRILINEAR);
+    }
+}
+
+void BarraTokens_Descarregar(void)
+{
+    if (simboloCarregado && simboloIA.id != 0) UnloadTexture(simboloIA);
+    simboloIA = (Texture2D){0};
+    simboloCarregado = false;
+}
 
 static int   valorAnterior = -1;
 static float animPerda[TOKENS_MAX];   // tempo restante da animacao de perda
@@ -80,12 +109,19 @@ static void Reflexo(Rectangle r, float opacidade)
 
 static void DesenharBateria(Rectangle corpo, int valor, bool offline)
 {
-    Color contorno = offline ? COR_CINZA : COR_MARINHO;
+    Color contorno = offline ? COR_CINZA : COR_CLARA;
 
     // corpo e polo da bateria
+    // fundo opaco da bateria
+    DrawRectangleRounded(corpo, 0.35f, 8, offline ? COR_CLARA : COR_ROSA_CLARO);
     DrawRectangleRounded(corpo, 0.35f, 8, Fade(COR_MARINHO, 0.10f));
     DrawRectangleRoundedLinesEx(corpo, 0.35f, 8, 2.5f, contorno);
     Rectangle polo = { corpo.x + corpo.width + 2, corpo.y + corpo.height * 0.3f, 6, corpo.height * 0.4f };
+    // contorno escuro fino por fora, para a bateria nao sumir em fundo claro
+    Color bordaEscura = Fade((Color){ 20, 22, 60, 255 }, 0.85f);
+    DrawRectangleRoundedLinesEx((Rectangle){ corpo.x - 1.5f, corpo.y - 1.5f, corpo.width + 3, corpo.height + 3 },
+                                0.35f, 8, 1.2f, bordaEscura);
+    DrawRectangleRounded((Rectangle){ polo.x - 1, polo.y - 1, polo.width + 2, polo.height + 2 }, 0.5f, 4, bordaEscura);
     DrawRectangleRounded(polo, 0.5f, 4, contorno);
 
     float pulso = 0.85f + 0.15f * (0.5f + 0.5f * sinf(tempoTotal * 3.0f));
@@ -102,8 +138,10 @@ static void DesenharBateria(Rectangle corpo, int valor, bool offline)
         Color nivel = (i == 0 && Tokens_ReservaUsada()) ? COR_VERMELHO : COR_AZUL;
 
         if (cheia) {
-            // degrade de cima (mais claro) para baixo
-            Color topo = Misturar(nivel, WHITE, 0.25f);
+            // degrade de cima (rosa) para baixo (azul); a reserva fica toda vermelha
+            Color topo = (i == 0 && Tokens_ReservaUsada())
+                         ? Misturar(nivel, WHITE, 0.25f)
+                         : Misturar(COR_ROSA, WHITE, 0.15f);
             DrawRectangleGradientV((int)parte.x, (int)parte.y, (int)parte.width, (int)parte.height,
                                    Fade(topo, pulso), Fade(nivel, pulso));
             Reflexo(parte, 0.45f);
@@ -129,49 +167,64 @@ static void DesenharBateria(Rectangle corpo, int valor, bool offline)
     Reflexo(corpo, 0.25f);
 }
 
+static void Desenha(const char *t, int x, int y, int tam, Color cor, bool forte)
+{
+    if (forte) UiDrawTextEmphasis(t, x, y, tam, cor); else UiDrawText(t, x, y, tam, cor);
+}
+// Texto claro com contorno fino e escuro, para ler em qualquer cena (a barra nao tem caixa).
+static void TextoContornado(const char *t, float x, float y, int tam, Color cor, bool forte)
+{
+    int ix = (int)x, iy = (int)y;
+    Color borda = Fade((Color){ 20, 22, 60, 255 }, 0.85f);
+    for (int dx = -1; dx <= 1; dx++)
+        for (int dy = -1; dy <= 1; dy++)
+            if (dx || dy) Desenha(t, ix + dx, iy + dy, tam, borda, forte);
+    Desenha(t, ix, iy, tam, cor, forte);
+}
+
 void BarraTokens_Desenhar(float x, float y)
 {
     int valor = Tokens_Valor();
     bool offline = Tokens_IAOffline();
 
-    // painel de vidro
-    Rectangle painel = { x, y, BARRA_LARGURA, BARRA_ALTURA };
-    DrawRectangleRounded((Rectangle){ x + 3, y + 4, painel.width, painel.height }, 0.5f, 12,
-                         Fade(BLACK, 0.25f));                       // sombra
-    DrawRectangleRounded(painel, 0.5f, 12, Fade(COR_CLARA, 0.92f));
-    Reflexo(painel, 0.6f);
-    DrawRectangleRoundedLinesEx(painel, 0.5f, 12, 2.0f, offline ? COR_CINZA : COR_AZUL);
-
-    // avatar redondo da IA (bolha do MSN)
+    // avatar redondo com o simbolo da IA (bolha do MSN)
     Vector2 c = { x + 36, y + BARRA_ALTURA / 2.0f };
-    Color corOrbe = offline ? COR_CINZA : COR_AZUL;
-    DrawCircleV(c, 25, offline ? COR_CINZA : COR_MARINHO);
-    for (int k = 0; k < 8; k++) {   // degrade feito com circulos
-        float raio = 22.0f - k * 2.0f;
-        DrawCircleV((Vector2){ c.x, c.y + k * 0.6f }, raio, Misturar(corOrbe, COR_CLARA, k / 14.0f));
+    CarregarSimbolo();
+    DrawCircleV(c, 26, offline ? COR_CINZA : COR_ROSA);              // aro
+    if (offline)
+        DrawCircleV(c, 24, (Color){ 120, 124, 140, 255 });
+    else
+        DrawCircleGradient((Vector2){ c.x, c.y }, 24, COR_AVATAR_CENTRO, COR_AVATAR_BORDA);
+    if (simboloIA.id != 0) {
+        float lado = 38.0f;
+        DrawTexturePro(simboloIA,
+                       (Rectangle){ 0, 0, (float)simboloIA.width, (float)simboloIA.height },
+                       (Rectangle){ c.x - lado / 2, c.y - lado / 2, lado, lado },
+                       (Vector2){ 0, 0 }, 0.0f,
+                       offline ? Fade(COR_CLARA, 0.5f) : WHITE);
+    } else {
+        // sem a imagem, volta para o texto "IA"
+        int largIA = UiMeasureText("IA", 20);
+        UiDrawText("IA", (int)c.x - largIA / 2, (int)c.y - 8, 20, WHITE);
     }
-    DrawEllipse((int)c.x, (int)c.y - 13, 13, 6, Fade(WHITE, 0.45f));
-    int largIA = UiMeasureText("IA", 20);
-    UiDrawText("IA", (int)c.x - largIA / 2 + 1, (int)c.y - 7, 20, Fade(COR_MARINHO, 0.6f));
-    UiDrawText("IA", (int)c.x - largIA / 2, (int)c.y - 8, 20, WHITE);
+    DrawEllipse((int)c.x, (int)c.y - 14, 12, 5, Fade(WHITE, 0.25f));
 
     // status do MSN
     Vector2 st = { c.x + 17, c.y + 17 };
     DrawCircleV(st, 8, WHITE);
     DrawCircleV(st, 6, offline ? COR_CINZA : COR_VERDE);
 
-    // titulo, status e contagem
-    UiDrawTextEmphasis("Tokens da IA", (int)x + 72, (int)y + 8, 14, COR_MARINHO);
+    // titulo, status e contagem (sem caixa: texto claro com sombra)
+    TextoContornado("Tokens da", x + 72, y + 6, 15, WHITE, true);
+    TextoContornado("IA", x + 72 + UiMeasureTextEmphasis("Tokens da ", 15), y + 6, 15, offline ? WHITE : (Color){255,150,230,255}, true);
     const char *status = offline ? "offline" : "online";
-    UiDrawTextEmphasis(status, (int)x + BARRA_LARGURA - 18 - UiMeasureTextEmphasis(status, 14), (int)y + 8, 14,
-             offline ? COR_MARINHO : (Color){25, 105, 71, 255});
+    TextoContornado(status, x + BARRA_LARGURA - 18 - UiMeasureTextEmphasis(status, 15), y + 6, 15,
+       offline ? (Color){200,200,210,255} : (Color){140,230,150,255}, true);
 
     // bateria unica dividida em 3
     Rectangle corpo = { x + 72, y + 28, 140, 30 };
     DesenharBateria(corpo, valor, offline);
 
-    // numero ao lado, como "3/3"
     const char *txt = TextFormat("%d/%d", valor, TOKENS_MAX);
-    UiDrawText(txt, (int)(corpo.x + corpo.width + 18), (int)corpo.y + 8, 16,
-             offline ? COR_CINZA : COR_MARINHO);
+    TextoContornado(txt, corpo.x + corpo.width + 18, corpo.y + 7, 17, WHITE, true);
 }
