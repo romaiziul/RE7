@@ -184,19 +184,7 @@ static void Fundo(void)
     TextoForte("PC da", 40, 28, 26, WHITE);
     TextoForte("LIA", 40 + UiMeasureTextEmphasis("PC da ", 26), 28, 26, COR_ROSA_TXT);
 
-    /* rodape: botao de desligar no estilo do XP (so decorativo, nao faz nada) e frase */
-    Rectangle desligar = {40, 655, 40, 40};
-    Rectangle dentro = {desligar.x + 2, desligar.y + 2, 36, 36};
-    DrawRectangleRounded(desligar, .28f, 8, WHITE);
-    DrawRectangleRounded(dentro, .25f, 8, (Color){180, 45, 20, 255});
-    DrawRectangleRounded((Rectangle){dentro.x, dentro.y, dentro.width, dentro.height * 0.55f},
-                         .35f, 8, (Color){235, 95, 50, 255});
-    DrawRectangleRounded((Rectangle){dentro.x + 4, dentro.y + 3, dentro.width - 8, 9},
-                         .6f, 8, Fade(WHITE, .30f));                       /* reflexo de vidro */
-    Vector2 meio = {desligar.x + 20, desligar.y + 21};
-    DrawRing(meio, 8, 11, -60, 240, 32, WHITE);                           /* abertura em cima */
-    DrawRectangleRounded((Rectangle){meio.x - 1.5f, meio.y - 13, 3, 11}, .8f, 4, WHITE);
-    Texto("Desligar o computador", 94, 664, 20, WHITE);
+    /* rodape: so a frase. O canto esquerdo fica livre para a engrenagem de pausa do game.c. */
     Texto("Depois de entrar, a IA estará esperando por você.", 800, 668, 16, Fade(WHITE, .85f));
 }
 
