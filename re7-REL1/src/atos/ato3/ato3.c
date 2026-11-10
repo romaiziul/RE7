@@ -8,38 +8,144 @@
 
 
 // =====================================================
-// AUDITORIO (desenhado em codigo, quadro 1280x720)
+// AUDITORIO (assets pintados, quadro 1280x720)
 // =====================================================
 
-#define COR_PELE_PLATEIA   (Color){19, 20, 33, 255}
-#define COR_ROUPA_PLATEIA  (Color){30, 31, 49, 255}
+// Recorte do fundo: o palco fica centralizado no quadro (o lado direito da
+// imagem e so parede). 1320 x 742.5 e 16:9, como a janela.
+#define AUD_RECORTE_LARGURA  1320.0f
+#define AUD_RECORTE_ALTURA    742.5f
 
-// Uma pessoa da plateia. "pulo" sobe a cabeca durante os aplausos.
-static void DesenharPessoa(int x, float pulo, Color pele, Color roupa)
+// Cores tiradas dos assets pintados
+#define COR_TINTA_FAIXA   (Color){ 92,  58,  52, 255}   // letras na faixa de pano
+#define COR_LUZ_QUENTE    (Color){255, 214, 150, 255}   // refletor e brilhos dos aplausos
+#define COR_MADEIRA_CLARA (Color){178, 112,  70, 255}   // tampo do pulpito (piso do palco)
+#define COR_MADEIRA       (Color){134,  80,  52, 255}
+#define COR_MADEIRA_ESC   (Color){ 94,  54,  40, 255}
+#define COR_CONTORNO      (Color){ 82,  46,  36, 255}   // contorno fino, como nos sprites
+
+// Lia e pulpito (centro do palco no recorte)
+#define LIA_ALTURA     400.0f
+#define LIA_TOPO       175.0f
+#define PULPITO_TOPO   420.0f
+
+static void DesenharFundo(Texture2D fundo)
 {
-    DrawCircle(x, (int)(484 - pulo), 19, pele);
-    DrawRectangleRounded(
-        (Rectangle){x - 28.0f, 501.0f - pulo * 0.4f, 56, 55},
-        0.3f, 8, roupa
+    if (fundo.id == 0)
+    {
+        ClearBackground((Color){52, 36, 48, 255});
+        return;
+    }
+
+    DrawTexturePro(
+        fundo,
+        (Rectangle){0, 0, AUD_RECORTE_LARGURA, AUD_RECORTE_ALTURA},
+        (Rectangle){0, 0, 1280, 720},
+        (Vector2){0, 0}, 0.0f, WHITE
     );
 }
 
-// Duas maos batendo palmas acima da pessoa (tracinhos que abrem e fecham)
-static void DesenharPalmas(int x, float fase)
+// Titulo pintado na faixa de pano em branco do fundo
+static void DesenharTituloFaixa(void)
 {
-    float abertura = 4.0f + 6.0f * fabsf(sinf(fase));
-    Color cor = Fade((Color){255, 236, 190, 255}, 0.75f);
+    const char *titulo = "CONCURSO DE ORATÓRIA";
+    int fs = 34;
+    int x = (1280 - UiMeasureTextEmphasis(titulo, fs)) / 2;
 
-    DrawLineEx((Vector2){x - abertura, 470}, (Vector2){x - abertura - 5, 461}, 2.0f, cor);
-    DrawLineEx((Vector2){x + abertura, 470}, (Vector2){x + abertura + 5, 461}, 2.0f, cor);
+    UiDrawTextEmphasis(titulo, x, 136, fs, Fade(COR_TINTA_FAIXA, 0.88f));
 }
 
-void Ato3_DesenharCenario(const Ato3Cena *cena)
+static void DesenharPulpito(void)
+{
+    // corpo (a parte de baixo fica atras da caixa de dialogo)
+    Rectangle corpo = {552, PULPITO_TOPO + 16, 176, 150};
+    DrawRectangleGradientV((int)corpo.x, (int)corpo.y, (int)corpo.width, (int)corpo.height,
+                           COR_MADEIRA, COR_MADEIRA_ESC);
+    DrawRectangleLinesEx(corpo, 2.0f, COR_CONTORNO);
+
+    // painel frontal em baixo-relevo
+    Rectangle painel = {corpo.x + 18, corpo.y + 18, corpo.width - 36, corpo.height - 36};
+    DrawRectangleLinesEx(painel, 1.5f, Fade(COR_CONTORNO, 0.6f));
+    DrawLineEx((Vector2){painel.x + 2, painel.y + 2}, (Vector2){painel.x + painel.width - 2, painel.y + 2},
+               1.5f, Fade(COR_MADEIRA_CLARA, 0.5f));
+
+    // tampo inclinado
+    Rectangle tampo = {536, PULPITO_TOPO, 208, 20};
+    DrawRectangleRounded(tampo, 0.4f, 8, COR_MADEIRA_CLARA);
+    DrawRectangleRoundedLines(tampo, 0.4f, 8, COR_CONTORNO);
+    DrawLineEx((Vector2){tampo.x + 10, tampo.y + 5}, (Vector2){tampo.x + tampo.width - 10, tampo.y + 5},
+               2.0f, Fade(WHITE, 0.18f));
+
+    // microfone
+    // (abaixo do queixo da Lia, para nao cobrir o rosto)
+    DrawLineEx((Vector2){570, PULPITO_TOPO + 2}, (Vector2){584, PULPITO_TOPO - 26}, 3.0f, COR_CONTORNO);
+    DrawCircleV((Vector2){585, PULPITO_TOPO - 30}, 6.5f, (Color){58, 44, 50, 255});
+    DrawCircleV((Vector2){583, PULPITO_TOPO - 32}, 2.0f, Fade(WHITE, 0.35f));
+}
+
+// Monitor antigo no canto do pulpito. A tela acende com o MSN.
+static void DesenharMonitor(Texture2D monitor, bool ligado)
+{
+    const float lado = 92.0f;
+    Rectangle destino = {700, PULPITO_TOPO - lado + 6, lado, lado};
+
+    if (monitor.id != 0)
+    {
+        DrawTexturePro(monitor, (Rectangle){0, 0, (float)monitor.width, (float)monitor.height},
+                       destino, (Vector2){0, 0}, 0.0f, WHITE);
+    }
+    else
+    {
+        DrawRectangleRounded(destino, 0.15f, 8, (Color){226, 205, 180, 255});
+    }
+
+    if (!ligado) return;
+
+    // area da tela dentro da imagem do monitor (proporcoes do asset)
+    Rectangle tela = {
+        destino.x + destino.width * 0.125f,
+        destino.y + destino.height * 0.16f,
+        destino.width * 0.62f,
+        destino.height * 0.53f
+    };
+
+    DrawRectangleRounded(tela, 0.12f, 6, (Color){92, 186, 140, 235});
+    DrawRectangleGradientV((int)tela.x + 2, (int)tela.y + 2, (int)tela.width - 4, (int)(tela.height * 0.45f),
+                           Fade(WHITE, 0.22f), Fade(WHITE, 0.0f));
+
+    // as duas figurinhas do MSN
+    float cx = tela.x + tela.width / 2;
+    float cy = tela.y + tela.height / 2;
+    DrawCircleV((Vector2){cx - 6, cy - 5}, 4.0f, (Color){238, 250, 242, 255});
+    DrawCircleV((Vector2){cx + 6, cy - 3}, 4.0f, (Color){150, 214, 250, 255});
+    DrawRectangleRounded((Rectangle){cx - 10, cy, 8, 7}, 0.5f, 4, (Color){238, 250, 242, 255});
+    DrawRectangleRounded((Rectangle){cx + 2, cy + 2, 8, 7}, 0.5f, 4, (Color){150, 214, 250, 255});
+
+    // brilho verde da tela no rosto da Lia e no tampo
+    DrawCircleGradient((Vector2){cx, cy}, 70.0f, Fade((Color){120, 220, 170, 255}, 0.10f), Fade(BLANK, 0.0f));
+}
+
+// Aplausos: a luz do palco esquenta e brilhos dourados sobem da plateia
+static void DesenharAplausos(float t)
+{
+    for (int i = 0; i < 46; i++)
+    {
+        float x = fmodf(i * 211.7f + 40.0f, 1280.0f) + sinf(t * 1.3f + i) * 10.0f;
+        float subida = fmodf(t * (38.0f + (i % 5) * 9.0f) + i * 61.0f, 560.0f);
+        float y = 720.0f - subida;
+        float vida = 1.0f - subida / 560.0f;
+        float r = 1.6f + (i % 3) * 1.1f;
+
+        DrawCircleV((Vector2){x, y}, r * 3.2f, Fade(COR_LUZ_QUENTE, 0.07f * vida));
+        DrawCircleV((Vector2){x, y}, r, Fade(COR_LUZ_QUENTE, 0.75f * vida));
+    }
+}
+
+void Ato3_DesenharCenario(const Ato3Cena *cena, const Assets *assets)
 {
     float t = (float)GetTime();
 
-    // Parede do auditorio.
-    ClearBackground((Color){24, 23, 42, 255});
+    ClearBackground(BLACK);
 
     // Camera: na conclusao ela se aproxima da Lia, no pulpito.
     Camera2D camera = { 0 };
@@ -49,107 +155,37 @@ void Ato3_DesenharCenario(const Ato3Cena *cena)
 
     BeginMode2D(camera);
 
-    DrawRectangleGradientV(
-        170, 0, 940, 440,
-        (Color){52, 48, 72, 255},
-        (Color){27, 26, 45, 255}
-    );
+    DesenharFundo(assets->bgAuditorio);
+    DesenharTituloFaixa();
 
-    // Luz quente sobre o palco (mais forte quando a camera destaca a Lia).
-    DrawTriangle(
-        (Vector2){640, 35},
-        (Vector2){310, 440},
-        (Vector2){970, 440},
-        Fade((Color){255, 226, 160, 255}, 0.13f + 0.12f * cena->foco)
-    );
+    // Refletor sobre a Lia (mais forte quando a camera a destaca ou ha aplausos)
+    float luz = 0.10f + 0.10f * cena->foco + (cena->aplausos ? 0.06f + 0.03f * sinf(t * 2.0f) : 0.0f);
+    DrawCircleGradient((Vector2){640, 330}, 330.0f, Fade(COR_LUZ_QUENTE, luz), Fade(COR_LUZ_QUENTE, 0.0f));
 
-    // Cortinas.
-    DrawRectangle(0, 0, 170, 465, (Color){102, 26, 51, 255});
-    DrawRectangle(1110, 0, 170, 465, (Color){102, 26, 51, 255});
-
-    for (int i = 0; i < 6; i++)
+    // Lia atras do pulpito. Nervosa, ela treme um pouco.
+    if (cena->lia.id != 0)
     {
-        DrawRectangle(i * 30, 0, 12, 465, (Color){73, 20, 40, 255});
-        DrawRectangle(1110 + i * 30, 0, 12, 465, (Color){73, 20, 40, 255});
+        float tremor = sinf(t * 45.0f) * 2.0f * cena->nervosismo;
+        float largura = LIA_ALTURA * (float)cena->lia.width / (float)cena->lia.height;
+
+        DrawTexturePro(
+            cena->lia,
+            (Rectangle){0, 0, (float)cena->lia.width, (float)cena->lia.height},
+            (Rectangle){640 - largura / 2 + tremor, LIA_TOPO, largura, LIA_ALTURA},
+            (Vector2){0, 0}, 0.0f, WHITE
+        );
     }
 
-    DrawRectangle(0, 0, 1280, 65, (Color){82, 22, 43, 255});
-
-    // Faixa do concurso.
-    Rectangle faixa = {350, 85, 580, 65};
-
-    DrawRectangleRounded(faixa, 0.15f, 8, (Color){232, 213, 169, 255});
-
-    const char *titulo = "CONCURSO DE ORATÓRIA";
-    int largura = UiMeasureText(titulo, 28);
-
-    UiDrawText(titulo, (1280 - largura) / 2, 106, 28, (Color){53, 40, 57, 255});
-
-    // Piso e borda do palco.
-    DrawRectangle(170, 400, 940, 65, (Color){118, 77, 54, 255});
-    DrawRectangle(170, 450, 940, 15, (Color){69, 44, 38, 255});
-
-    // Lia (formas). Nervosa, ela treme um pouco.
-    float tremor = sinf(t * 45.0f) * 2.0f * cena->nervosismo;
-    int lx = 640 + (int)tremor;
-
-    DrawCircle(lx, 254, 28, (Color){230, 179, 146, 255});
-    DrawRectangle(lx - 30, 282, 60, 85, (Color){141, 109, 181, 255});
-    DrawCircle(lx, 239, 29, (Color){55, 35, 39, 255});
-    DrawCircle(lx, 255, 23, (Color){230, 179, 146, 255});
-
-    // Pulpito e computador antigo.
-    DrawRectangle(575, 340, 130, 95, (Color){101, 66, 45, 255});
-    DrawRectangle(560, 327, 160, 18, (Color){155, 108, 65, 255});
-    DrawRectangle(679, 288, 52, 38, (Color){17, 23, 32, 255});
+    DesenharPulpito();
 
     bool ligado = cena->pcOnline;
     if (cena->pcPiscando) ligado = fmodf(t * 7.0f, 1.0f) < 0.5f;
 
-    Color tela = ligado ? (Color){74, 190, 135, 255} : (Color){25, 28, 35, 255};
-    DrawRectangle(684, 293, 42, 28, tela);
-
-    if (ligado)
-    {
-        // bonequinho do MSN na tela
-        DrawCircle(700, 302, 4, (Color){230, 250, 240, 255});
-        DrawCircle(710, 304, 4, (Color){120, 210, 255, 255});
-        DrawRectangle(696, 307, 8, 6, (Color){230, 250, 240, 255});
-        DrawRectangle(706, 309, 8, 6, (Color){120, 210, 255, 255});
-    }
-
-    // Microfone.
-    DrawLineEx((Vector2){600, 328}, (Vector2){615, 293}, 4, DARKGRAY);
-    DrawCircle(615, 291, 6, BLACK);
-
-    // Plateia (a professora e o amigo na primeira fileira).
-    for (int i = 0; i < 12; i++)
-    {
-        int x = 90 + i * 100;
-        float fase = t * 11.0f + i * 1.7f;
-        float pulo = cena->aplausos ? fabsf(sinf(fase * 0.5f)) * 4.0f : 0.0f;
-
-        Color pele = COR_PELE_PLATEIA;
-        Color roupa = COR_ROUPA_PLATEIA;
-
-        if (i == 1) { pele = (Color){201, 155, 124, 255}; roupa = (Color){83, 117, 107, 255}; }  // professora
-        if (i == 2) { pele = (Color){211, 165, 131, 255}; roupa = (Color){75, 107, 158, 255}; }  // amigo
-
-        DesenharPessoa(x, pulo, pele, roupa);
-
-        if (cena->aplausos) DesenharPalmas(x, fase);
-    }
-
-    // Rosto da professora: sorriso ou boca reta.
-    Vector2 boca = {190, 488 - (cena->aplausos ? fabsf(sinf((t * 11.0f + 1.7f) * 0.5f)) * 4.0f : 0.0f)};
-    Color corBoca = (Color){80, 45, 45, 255};
-
-    if (cena->professoraSorri)
-        DrawRing(boca, 6.0f, 8.0f, 20.0f, 160.0f, 12, corBoca);
-    else
-        DrawLineEx((Vector2){boca.x - 6, boca.y + 4}, (Vector2){boca.x + 6, boca.y + 4}, 2.0f, corBoca);
+    DesenharMonitor(assets->monitorCrt, ligado);
 
     EndMode2D();
+
+    if (cena->aplausos) DesenharAplausos(t);
 }
 
 
@@ -234,7 +270,8 @@ void Ato3_DesenharPapel(
     int tamanhoFonte,
     const float nitidez[3],
     int destaque,
-    Vector2 tremor)
+    Vector2 tremor,
+    Texture2D folha)
 {
     area.x += tremor.x;
     area.y += tremor.y;
@@ -245,11 +282,28 @@ void Ato3_DesenharPapel(
     int margem = (int)(fs * 1.4f);
 
     // Sombra e folha.
-    DrawRectangleRounded(
-        (Rectangle){area.x + 8, area.y + 8, area.width, area.height},
-        0.03f, 8, Fade(BLACK, 0.35f)
-    );
-    DrawRectangleRounded(area, 0.03f, 8, (Color){244, 233, 204, 255});
+    if (folha.id != 0)
+    {
+        // a imagem tem uma borda transparente: amplia para a folha cobrir a area
+        const float bordaX = 0.037f, bordaCima = 0.021f, bordaBaixo = 0.028f;
+        float largura = area.width / (1.0f - 2.0f * bordaX);
+        float altura = area.height / (1.0f - bordaCima - bordaBaixo);
+        Rectangle origem = {0, 0, (float)folha.width, (float)folha.height};
+        Rectangle destino = {area.x - largura * bordaX, area.y - altura * bordaCima, largura, altura};
+
+        // sombra com o mesmo recorte da folha (inclui a ponta dobrada)
+        DrawTexturePro(folha, origem, (Rectangle){destino.x + 7, destino.y + 7, largura, altura},
+                       (Vector2){0, 0}, 0.0f, Fade(BLACK, 0.32f));
+        DrawTexturePro(folha, origem, destino, (Vector2){0, 0}, 0.0f, WHITE);
+    }
+    else
+    {
+        DrawRectangleRounded(
+            (Rectangle){area.x + 8, area.y + 8, area.width, area.height},
+            0.03f, 8, Fade(BLACK, 0.30f)
+        );
+        DrawRectangleRounded(area, 0.03f, 8, (Color){244, 233, 204, 255});
+    }
 
     int tituloFs = fs + 2;
     UiDrawTextEmphasis("MEU DISCURSO", (int)area.x + margem, (int)area.y + (int)(fs * 0.8f), tituloFs, tinta);

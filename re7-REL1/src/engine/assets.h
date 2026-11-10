@@ -63,6 +63,13 @@ typedef struct
     Texture2D pcDesktop;        // area de trabalho do Doors XP
     Texture2D pcPerfil;         // pagina da rede social com o recado da Lia
 
+
+    // Ato 3: auditorio do concurso de oratoria
+
+    Texture2D bgAuditorio;      // palco com cortinas e faixa em branco
+    Texture2D monitorCrt;       // monitor antigo do pulpito (tela apagada)
+    Texture2D papelDiscurso;    // folha do discurso (fundo do papel)
+
 } Assets;
 
 
