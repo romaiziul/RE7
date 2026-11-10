@@ -1171,15 +1171,15 @@ static bool PodePausar(GameScreen tela)
 
 static Rectangle AreaBotaoMenu(GameScreen tela)
 {
-    const float largura = 104.0f;
+    const float lado = 44.0f;      // icone de engrenagem
     const float margem = 14.0f;
 
     if (tela == SCREEN_ROOM)
-        return (Rectangle){GetScreenWidth() - largura - margem, margem, largura, 40};
+        return (Rectangle){GetScreenWidth() - lado - margem, margem, lado, lado};
 
     // Na senha, o cabecalho ocupa a parte de cima da tela.
-    float y = (tela == SCREEN_SENHA) ? 666.0f : margem;
-    return (Rectangle){margem, y, largura, 40};
+    float y = (tela == SCREEN_SENHA) ? 662.0f : margem;
+    return (Rectangle){margem, y, lado, lado};
 }
 
 static void AbrirPausa(GameState *game)
@@ -1194,7 +1194,7 @@ static void AtualizarMenuPausa(GameState *game)
 {
     if (game->currentScreen == SCREEN_CONFIRM_MENU)
     {
-        if (IsButtonClicked(cancelarRetorno))
+        if (IsButtonClicked(cancelarRetorno) || IsKeyPressed(KEY_ESCAPE))
         {
             AudioManager_Play(SOM_MOUSE);
             mensagemPausa = NULL;
@@ -1212,7 +1212,7 @@ static void AtualizarMenuPausa(GameState *game)
         return;
     }
 
-    if (IsButtonClicked(fecharPausa))
+    if (IsButtonClicked(fecharPausa) || IsKeyPressed(KEY_ESCAPE))
     {
         AudioManager_Play(SOM_MOUSE);
         game->currentScreen = game->pauseReturnScreen;
@@ -1504,16 +1504,11 @@ void UpdateGame(GameState *game)
 
     if (game->currentScreen == SCREEN_GAME)
     {
-        // ESC: salva e volta ao menu
+        // ESC: abre o menu de pausa (o mesmo da engrenagem)
         if (IsKeyPressed(KEY_ESCAPE))
         {
-            SaveGame(game);
-
-            fadeFase = FADE_NENHUM;
-            pcAtivo = false;
-
-            game->currentScreen = SCREEN_MENU;
-
+            AudioManager_Play(SOM_MOUSE);
+            AbrirPausa(game);
             return;
         }
 
@@ -1626,10 +1621,45 @@ static void DesenharBotaoPausa(Rectangle area, const char *texto, int tamanho)
     UiDrawTextEmphasis(texto, x, y, tamanho, WHITE);
 }
 
+// Engrenagem desenhada em codigo: discreta, ganha destaque ao passar o mouse
+static void DesenharIconeEngrenagem(Rectangle area, bool sobre)
+{
+    Vector2 c = { area.x + area.width / 2.0f, area.y + area.height / 2.0f };
+    Color cor = sobre ? (Color){255, 105, 200, 255} : Fade(WHITE, 0.6f);
+
+    DrawCircleV(c, area.width / 2.0f, Fade(BLACK, sobre ? 0.55f : 0.35f));
+
+    DrawRing(c, 6.0f, 12.0f, 0.0f, 360.0f, 40, cor);              // corpo com furo no meio
+
+    for (int i = 0; i < 8; i++)                                   // 8 dentes
+    {
+        float ang = i * 45.0f * DEG2RAD;
+        Vector2 ponta = { c.x + cosf(ang) * 12.0f, c.y + sinf(ang) * 12.0f };
+        DrawRectanglePro((Rectangle){ ponta.x, ponta.y, 6.0f, 6.0f },
+                         (Vector2){ 3.0f, 3.0f }, i * 45.0f, cor);
+    }
+}
+
 void DrawPauseControls(GameState *game)
 {
-    if (PodePausar(game->currentScreen))
-        DesenharBotaoPausa(AreaBotaoMenu(game->currentScreen), "Menu", 20);
+    if (!PodePausar(game->currentScreen)) return;
+
+    Rectangle area = AreaBotaoMenu(game->currentScreen);
+    bool sobre = CheckCollisionPointRec(GetMousePosition(), area);
+
+    DesenharIconeEngrenagem(area, sobre);
+
+    // dica ao passar o mouse
+    if (sobre)
+    {
+        const char *dica = "Menu (ESC)";
+        int larg = UiMeasureText(dica, 18);
+        float x = (game->currentScreen == SCREEN_ROOM) ? area.x - larg - 30.0f : area.x + area.width + 8.0f;
+        Rectangle caixa = { x, area.y + 7.0f, larg + 20.0f, 30.0f };
+
+        DrawRectangleRounded(caixa, 0.4f, 8, Fade(BLACK, 0.7f));
+        UiDrawText(dica, (int)caixa.x + 10, (int)caixa.y + 5, 18, WHITE);
+    }
 }
 
 static void DesenharMenuPausa(void)
@@ -1650,7 +1680,7 @@ static void DesenharMenuPausa(void)
     if (mensagemPausa)
         DrawCenteredText(mensagemPausa, 537, 19, SKYBLUE);
 
-    DrawCenteredText("Clique no X para retomar a partida", 583, 18, Fade(WHITE, 0.7f));
+    DrawCenteredText("Clique no X ou aperte ESC para retomar", 583, 18, Fade(WHITE, 0.7f));
 }
 
 static void DesenharConfirmacaoMenu(void)
