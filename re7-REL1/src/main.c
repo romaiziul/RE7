@@ -4,6 +4,8 @@
 #include "assets.h"
 #include "audio_manager.h"
 #include "ui.h"
+#include "barra_tokens.h"
+#include "senha.h"
 
 int main(void)
 {
@@ -49,6 +51,8 @@ int main(void)
 
 
     UnloadAssets(&assets);
+    BarraTokens_Descarregar();
+    Senha_Descarregar();
 
     AudioManager_Close();
 

@@ -1,21 +1,33 @@
 // Minijogo da senha do PC da Lia - Ato 1
-// Etapa 1: preencher os caracteres de cada fragmento.
-// Etapa 2: organizar os caracteres usando as pistas de posicionamento.
-// A IA so oferece ajuda na etapa 2, depois de cinco erros.
+// Visual: tela de login inspirada no Windows XP ("Doors XP", logo da Vitoria),
+// com o perfil da Lia, o campo de senha e a seta verde para confirmar.
+// Etapa 1: escolher os quatro caracteres que respondem as pistas dos fragmentos.
+// Etapa 2: arrastar os caracteres para a ordem certa usando as pistas de posicao.
+// A IA so oferece ajuda na etapa 2, a cada SENHA_ERROS_RODADA erros, sem aviso
+// previo na tela, numa janela de MSN igual a do Ato 2. A ajuda gasta 1 token
+// (o custo nao aparece na tela, como no Ato 2) e revela a 1a e a 3a posicoes.
 
 #include "senha.h"
 #include "tokens.h"
+#include "ui.h"
 #include "raylib.h"
 #include <string.h>
 
-#define COR_CLARA    (Color){232, 240, 250, 255}
-#define COR_AZUL_MED (Color){143, 178, 213, 255}
 #define COR_MARINHO  (Color){29, 38, 96, 255}
 #define COR_ROSA     (Color){227, 93, 215, 255}
+#define COR_ROSA_HOV (Color){255, 105, 200, 255}   /* rosa do hover das escolhas do Ato 2 */
+#define COR_ROSA_TXT (Color){255, 190, 235, 255}
 #define COR_AZUL     (Color){39, 172, 234, 255}
-#define COR_VERMELHO (Color){234, 84, 119, 255}
 #define COR_VERDE    (Color){76, 175, 80, 255}
-#define COR_CIANO    (Color){49, 220, 235, 255}
+#define COR_CLARA    (Color){232, 240, 250, 255}
+
+/* Cores da tela de login */
+#define XP_AZUL_ESC  (Color){0, 48, 150, 255}
+#define XP_AZUL      (Color){90, 126, 220, 255}
+#define XP_AZUL_CLA  (Color){130, 162, 236, 255}
+#define XP_LARANJA   (Color){245, 160, 40, 255}
+#define XP_BORDA     (Color){40, 70, 160, 255}
+#define XP_BOTAO     (Color){244, 246, 252, 255}
 
 typedef enum {
     ETAPA_CARACTERES,
@@ -28,47 +40,86 @@ typedef enum {
 
 static const char SENHA[SENHA_TAMANHO + 1] = "Y2K7";
 
-/* A ordem visual dos fragmentos na etapa 1 e A, C, B, D. */
-static const char FRAGMENTOS[] = {'A', 'B', 'C', 'D'};
-static const char *PISTAS[] = {
-    "Inicial de Kelly Key",
-    "Inicial da palavra Year",
-    "Ultimo algarismo de 2007",
-    "Primeiro algarismo de 2007"
-};
-
-/* Caracteres corretos correspondentes aos fragmentos A, C, B e D. */
+/* Caracteres corretos da etapa 1 (a ordem nao importa nesta etapa). */
 static const char RESPOSTAS_FRAGMENTOS[] = {'K', 'Y', '7', '2'};
 
 /* Oito opcoes da etapa 1: quatro corretas e quatro distratoras. */
 static const char OPCOES_FRAGMENTOS[] = {'A', '7', 'M', 'Y', '2', '9', 'K', '0'};
 
-/* Na etapa 2, as pecas aparecem na ordem solicitada: K, Y, 7, 2. */
+/* Na etapa 2, as pecas aparecem nesta ordem: K, Y, 7, 2. */
 static const char PECAS_ORDEM[] = {'K', 'Y', '7', '2'};
 
 static EstadoSenha estado;
 static int etapa;
 static char caracteresFragmentos[4];
-static int opcaoFragmentoSelecionada = -1;
 static char ordem[4];
-static int pecaSelecionada = -1;
 static bool posicaoRevelada[4];
 static int erros;
 static bool ajudaUsada;
 static bool mostrarDicaIA;
 static float tempoAviso;
+static bool avisoIncompleto;   /* aviso de "falta preencher", que nao conta como erro */
 static float tempoAcerto;
 
-static const Rectangle POPUP_IA = {330, 220, 620, 260};
-static const Rectangle BOTAO_ACEITAR_IA = {375, 390, 250, 48};
-static const Rectangle BOTAO_RECUSAR_IA = {655, 390, 250, 48};
-static const Rectangle BOTAO_CONTINUAR_DICA = {490, 475, 300, 50};
+/* Arraste da etapa 2 */
+static bool arrastando;
+static char arrasteCaractere;
+static int arrasteOrigem;      /* -1: veio da bandeja; 0 a 3: veio de uma posicao */
+
+
+/* Imagens: carregadas no primeiro desenho (precisam da janela aberta) */
+static Texture2D texLogo, texLia, texIA;
+static bool texturasCarregadas = false;
+
+/* Janela de MSN da IA (mesmo formato da escolha da IA no Ato 2) */
+static const Rectangle JANELA_MSN = {330, 170, 620, 330};
+
+static Rectangle BotaoMSN(int i)
+{
+    return (Rectangle){370.0f, 320.0f + i * 80.0f, 540.0f, 62.0f};
+}
+
+static const Rectangle SETA_ETAPA1 = {1054, 236, 42, 42};
+static const Rectangle SETA_ETAPA2 = {1062, 240, 42, 42};
+
+static Rectangle RetanguloOpcao(int i)
+{
+    return (Rectangle){742.0f + (i % 4) * 92.0f, 334.0f + (i / 4) * 70.0f, 78.0f, 56.0f};
+}
+
+static Rectangle RetanguloPosicao(int pos)
+{
+    return (Rectangle){742.0f + pos * 78.0f, 232.0f, 66.0f, 58.0f};
+}
+
+static Rectangle RetanguloPeca(int i)
+{
+    return (Rectangle){742.0f + i * 92.0f, 364.0f, 78.0f, 56.0f};
+}
+
+/* ------------------------- TEXTO (fonte Nunito do ui.c) ------------------------- */
+
+static void Texto(const char *texto, float x, float y, int tamanho, Color cor)
+{
+    UiDrawText(texto, (int)x, (int)y, tamanho, cor);
+}
+
+static void TextoForte(const char *texto, float x, float y, int tamanho, Color cor)
+{
+    UiDrawTextEmphasis(texto, (int)x, (int)y, tamanho, cor);
+}
 
 static void Centro(const char *texto, float centroX, float y, int tamanho, Color cor)
 {
-    DrawText(texto,
-             (int)(centroX - MeasureText(texto, tamanho) / 2.0f),
-             (int)y, tamanho, cor);
+    UiDrawText(texto, (int)(centroX - UiMeasureText(texto, tamanho) / 2.0f),
+               (int)y, tamanho, cor);
+}
+
+static void CentroForte(const char *texto, float centroX, float y, int tamanho, Color cor)
+{
+    UiDrawTextEmphasis(texto,
+                       (int)(centroX - UiMeasureTextEmphasis(texto, tamanho) / 2.0f),
+                       (int)y, tamanho, cor);
 }
 
 static bool Clique(Rectangle r)
@@ -77,48 +128,130 @@ static bool Clique(Rectangle r)
            IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
+static Texture2D CarregarComMipmaps(const char *caminho)
+{
+    Texture2D t = LoadTexture(caminho);
+    if (t.id != 0) {
+        GenTextureMipmaps(&t);
+        SetTextureFilter(t, TEXTURE_FILTER_TRILINEAR);
+    }
+    return t;
+}
+
+static void CarregarTexturas(void)
+{
+    if (texturasCarregadas) return;
+    texturasCarregadas = true;
+    texLogo = CarregarComMipmaps("assets/ato1/ato1_logo_doorsxp.png");
+    texLia  = CarregarComMipmaps("assets/comum/lia07_neutra.png");
+    texIA   = CarregarComMipmaps("assets/comum/iaStar.png");
+}
+
+void Senha_Descarregar(void)
+{
+    if (!texturasCarregadas) return;
+    if (texLogo.id) UnloadTexture(texLogo);
+    if (texLia.id)  UnloadTexture(texLia);
+    if (texIA.id)   UnloadTexture(texIA);
+    texLogo = texLia = texIA = (Texture2D){0};
+    texturasCarregadas = false;
+}
+
+static void DesenharTextura(Texture2D t, Rectangle origem, Rectangle destino)
+{
+    if (t.id != 0) DrawTexturePro(t, origem, destino, (Vector2){0, 0}, 0.0f, WHITE);
+}
+
+/* ------------------------- TELA DE LOGIN ------------------------- */
+
 static void Fundo(void)
 {
-    DrawRectangleGradientV(0, 96, 1280, 544,
-                           (Color){31, 65, 112, 255},
-                           (Color){13, 27, 64, 255});
-    DrawRectangle(0, 0, 1280, 96, COR_MARINHO);
-    DrawRectangle(0, 640, 1280, 80, COR_MARINHO);
-    DrawRectangleGradientH(0, 96, 640, 3, Fade(COR_CLARA, .15f), COR_ROSA);
-    DrawRectangleGradientH(640, 96, 640, 3, COR_ROSA, Fade(COR_CLARA, .15f));
+    DrawRectangle(0, 0, 1280, 720, XP_AZUL);
+    DrawCircleGradient((Vector2){260, 170}, 520, Fade(XP_AZUL_CLA, .9f), Fade(XP_AZUL, 0));
 
-    DrawText("PC da", 38, 30, 25, COR_CLARA);
-    DrawText("LIA", 125, 30, 25, COR_ROSA);
-    DrawText("DESAFIO DE ACESSO", 38, 62, 13, COR_AZUL_MED);
+    /* faixas de cima e de baixo */
+    DrawRectangle(0, 0, 1280, 86, XP_AZUL_ESC);
+    DrawRectangleGradientH(0, 86, 640, 3, Fade(WHITE, 0), WHITE);
+    DrawRectangleGradientH(640, 86, 640, 3, WHITE, Fade(WHITE, 0));
+    DrawRectangle(0, 634, 1280, 86, XP_AZUL_ESC);
+    DrawRectangleGradientH(0, 631, 640, 3, Fade(XP_LARANJA, 0), XP_LARANJA);
+    DrawRectangleGradientH(640, 631, 640, 3, XP_LARANJA, Fade(XP_LARANJA, 0));
+
+    /* separador vertical entre as pistas e o perfil */
+    DrawRectangleGradientV(560, 130, 2, 230, Fade(WHITE, 0), Fade(WHITE, .8f));
+    DrawRectangleGradientV(560, 360, 2, 230, Fade(WHITE, .8f), Fade(WHITE, 0));
+
+    TextoForte("PC da", 40, 28, 26, WHITE);
+    TextoForte("LIA", 40 + UiMeasureTextEmphasis("PC da ", 26), 28, 26, COR_ROSA_TXT);
+
+    /* rodape: so a frase. O canto esquerdo fica livre para a engrenagem de pausa do game.c. */
+    Texto("Depois de entrar, a IA estará esperando por você.", 800, 668, 16, Fade(WHITE, .85f));
 }
 
-static void Painel(Rectangle r, const char *titulo)
+/* Lado esquerdo: logo, boas-vindas e as pistas em caixinhas */
+static void LadoPistas(const char *subtitulo, const char **linhas, int quantidade)
 {
-    DrawRectangleRounded(r, .08f, 8, Fade(COR_MARINHO, .82f));
-    DrawRectangleRoundedLinesEx(r, .08f, 8, 1.5f, COR_AZUL_MED);
-    DrawText(titulo, (int)r.x + 16, (int)r.y + 9, 15, COR_AZUL_MED);
+    if (texLogo.id != 0) {
+        float altura = 128.0f * texLogo.height / texLogo.width;
+        DesenharTextura(texLogo, (Rectangle){0, 0, (float)texLogo.width, (float)texLogo.height},
+                        (Rectangle){90, 120, 128, altura});
+    }
+    TextoForte("Bem-vinda", 236, 150, 38, WHITE);
+    Texto(subtitulo, 238, 198, 18, Fade(WHITE, .9f));
+
+    for (int i = 0; i < quantidade; i++) {
+        Rectangle r = {90, 290.0f + i * 76.0f, 420, 66};
+        DrawRectangleRounded(r, .18f, 8, Fade(XP_AZUL_ESC, .45f));
+        DrawRectangleRoundedLinesEx(r, .18f, 8, 1.2f, Fade(WHITE, .5f));
+        Texto(linhas[2 * i], r.x + 16, r.y + 10, 15, COR_ROSA_TXT);
+        Texto(linhas[2 * i + 1], r.x + 16, r.y + 30, 20, WHITE);
+    }
 }
 
-static void BotaoCaractere(Rectangle r, char caractere, bool habilitado,
-                           bool selecionado, bool usado)
+/* Lado direito: foto e nome da usuaria */
+static void Perfil(void)
 {
-    Color fundo = usado ? Fade(COR_MARINHO, .72f) :
+    Rectangle foto = {620, 150, 96, 96};
+    DrawRectangleRounded((Rectangle){foto.x - 4, foto.y - 4, foto.width + 8, foto.height + 8},
+                         .18f, 8, XP_LARANJA);
+    DrawRectangleRounded((Rectangle){foto.x - 1, foto.y - 1, foto.width + 2, foto.height + 2},
+                         .16f, 8, WHITE);
+    /* recorte do rosto da Lia de 2007 */
+    DesenharTextura(texLia, (Rectangle){170, 140, 660, 660}, foto);
+
+    TextoForte("Lia", 740, 160, 34, WHITE);
+    Texto("Digite sua senha:", 742, 206, 18, Fade(WHITE, .9f));
+}
+
+static void SetaVerde(Rectangle b)
+{
+    bool sobre = CheckCollisionPointRec(GetMousePosition(), b);
+    DrawRectangleRounded(b, .25f, 6, sobre ? (Color){80, 200, 80, 255} : (Color){60, 170, 60, 255});
+    DrawRectangleRoundedLinesEx(b, .25f, 6, 2, WHITE);
+    DrawTriangle((Vector2){b.x + 30, b.y + 21}, (Vector2){b.x + 16, b.y + 10},
+                 (Vector2){b.x + 16, b.y + 32}, WHITE);
+    DrawRectangle((int)b.x + 9, (int)b.y + 17, 10, 8, WHITE);
+}
+
+static void BotaoCaractere(Rectangle r, char caractere, bool selecionado, bool usado)
+{
+    bool sobre = !usado && CheckCollisionPointRec(GetMousePosition(), r);
+    Color fundo = usado ? Fade(WHITE, .25f) :
                   selecionado ? COR_ROSA :
-                  habilitado ? COR_CLARA : Fade(COR_AZUL_MED, .35f);
-    Color texto = (usado || (!habilitado && !selecionado)) ? COR_AZUL_MED :
-                  selecionado ? WHITE : COR_MARINHO;
-
-    DrawRectangleRounded(r, .16f, 8, fundo);
-    DrawRectangleRoundedLinesEx(r, .16f, 8, 2,
-                                selecionado ? COR_ROSA : COR_AZUL);
+                  sobre ? (Color){255, 225, 246, 255} : XP_BOTAO;
+    DrawRectangleRounded(r, .18f, 6, fundo);
+    DrawRectangleRoundedLinesEx(r, .18f, 6, 1.5f, selecionado ? WHITE : XP_BORDA);
     char s[2] = {caractere, '\0'};
-    Centro(s, r.x + r.width / 2, r.y + (r.height - 28) / 2, 28, texto);
+    CentroForte(s, r.x + r.width / 2, r.y + (r.height - 28) / 2, 28,
+                usado ? Fade(WHITE, .6f) : selecionado ? WHITE : COR_MARINHO);
 }
+
+/* ------------------------- REGRAS ------------------------- */
+
 
 static void LimparFragmentos(void)
 {
     memset(caracteresFragmentos, 0, sizeof(caracteresFragmentos));
-    opcaoFragmentoSelecionada = -1;
 }
 
 static void LimparOrdem(void)
@@ -126,7 +259,7 @@ static void LimparOrdem(void)
     for (int i = 0; i < 4; i++) {
         if (!posicaoRevelada[i]) ordem[i] = '\0';
     }
-    pecaSelecionada = -1;
+    arrastando = false;
 }
 
 static bool CaractereJaUsadoNaEtapa1(char c)
@@ -138,6 +271,7 @@ static bool CaractereJaUsadoNaEtapa1(char c)
 
 static bool CaractereJaUsadoNaEtapa2(char c)
 {
+    if (arrastando && arrasteCaractere == c) return true;
     for (int i = 0; i < 4; i++)
         if (ordem[i] == c) return true;
     return false;
@@ -174,13 +308,6 @@ static bool OrdemCorreta(void)
     return true;
 }
 
-static bool TodosFragmentosPreenchidos(void)
-{
-    for (int i = 0; i < 4; i++)
-        if (!caracteresFragmentos[i]) return false;
-    return true;
-}
-
 static bool OrdemPreenchida(void)
 {
     for (int i = 0; i < 4; i++)
@@ -188,17 +315,17 @@ static bool OrdemPreenchida(void)
     return true;
 }
 
-static void RegistrarErroEtapa1(void)
+static void AvisarIncompleto(void)
 {
-    LimparFragmentos();
-    tempoAviso = 2.0f;
-    /* A etapa 1 nao tem contador de erros nem oferta de ajuda da IA. */
+    /* Confirmar sem completar nao conta como erro. */
+    avisoIncompleto = true;
+    tempoAviso = 1.8f;
 }
 
 static void ConfirmarFragmentos(void)
 {
-    if (!TodosFragmentosPreenchidos()) {
-        tempoAviso = 1.5f;
+    if (QuantidadeSelecionadaEtapa1() < 4) {
+        AvisarIncompleto();
         return;
     }
 
@@ -209,31 +336,31 @@ static void ConfirmarFragmentos(void)
         tempoAviso = 0.0f;
         LimparOrdem();
     } else {
-        RegistrarErroEtapa1();
+        /* A etapa 1 nao tem contador de erros nem oferta de ajuda da IA. */
+        LimparFragmentos();
+        avisoIncompleto = false;
+        tempoAviso = 2.0f;
     }
 }
 
 static void RegistrarErroEtapa2(void)
 {
+    avisoIncompleto = false;
     tempoAviso = 1.6f;
+    LimparOrdem();
 
-    /* Depois da ajuda, os erros deixam de ser contabilizados. */
+    /* Depois da ajuda, os erros deixam de ser contados. */
     if (!ajudaUsada) {
         erros++;
-        LimparOrdem();
-
         if (erros >= SENHA_ERROS_RODADA)
             estado = ETAPA_POPUP_IA;
-    } else {
-        /* Mantem as posicoes reveladas e nao incrementa o contador. */
-        LimparOrdem();
     }
 }
 
 static void ConfirmarOrdem(void)
 {
     if (!OrdemPreenchida()) {
-        tempoAviso = 1.5f;
+        AvisarIncompleto();
         return;
     }
 
@@ -263,16 +390,22 @@ static void AceitarAjudaIA(void)
     posicaoRevelada[0] = true;
     posicaoRevelada[2] = true;
 
-    pecaSelecionada = -1;
+    /* Se Y ou K estavam em outra posicao, saem de la. */
+    for (int i = 0; i < 4; i++) {
+        if (!posicaoRevelada[i] && (ordem[i] == 'Y' || ordem[i] == 'K'))
+            ordem[i] = '\0';
+    }
+
+    arrastando = false;
     estado = ETAPA_DICA_IA;
 }
 
 static void RecusarAjudaIA(void)
 {
-    /* Recusar nao consome nem recupera tokens; inicia outro ciclo de 5 erros. */
+    /* Recusar nao consome tokens; a oferta volta depois de mais SENHA_ERROS_RODADA erros. */
     erros = 0;
     estado = ETAPA_ORDEM;
-    tempoAviso = 2.0f;
+    tempoAviso = 0.0f;
 }
 
 void Senha_ComecarJogo(void)
@@ -288,94 +421,98 @@ void Senha_Iniciar(void)
     etapa = 1;
     erros = 0;
     tempoAviso = 0.0f;
+    avisoIncompleto = false;
     tempoAcerto = 0.0f;
     memset(posicaoRevelada, 0, sizeof(posicaoRevelada));
     memset(ordem, 0, sizeof(ordem));
     LimparFragmentos();
-    pecaSelecionada = -1;
+    arrastando = false;
 }
 
 /* ------------------------- ATUALIZACAO ------------------------- */
 
 static void AtualizarEtapa1(void)
 {
-    /* O jogador marca diretamente quatro dos oito caracteres disponiveis. */
+    /* A jogadora marca quatro dos oito caracteres; clicar de novo desmarca. */
     for (int i = 0; i < 8; i++) {
-        Rectangle r = {
-            235.0f + (i % 4) * 205.0f,
-            365.0f + (i / 4) * 62.0f,
-            150.0f, 48.0f
-        };
+        if (!Clique(RetanguloOpcao(i))) continue;
 
-        if (Clique(r)) {
-            char c = OPCOES_FRAGMENTOS[i];
-            int encontrado = -1;
+        char c = OPCOES_FRAGMENTOS[i];
+        int encontrado = -1;
+        for (int j = 0; j < 4; j++) {
+            if (caracteresFragmentos[j] == c) {
+                encontrado = j;
+                break;
+            }
+        }
 
+        if (encontrado >= 0) {
+            caracteresFragmentos[encontrado] = '\0';
+        } else if (QuantidadeSelecionadaEtapa1() < 4) {
             for (int j = 0; j < 4; j++) {
-                if (caracteresFragmentos[j] == c) {
-                    encontrado = j;
+                if (caracteresFragmentos[j] == '\0') {
+                    caracteresFragmentos[j] = c;
                     break;
                 }
             }
-
-            if (encontrado >= 0) {
-                /* Clicar novamente desmarca a opcao. */
-                caracteresFragmentos[encontrado] = '\0';
-            } else if (QuantidadeSelecionadaEtapa1() < 4) {
-                for (int j = 0; j < 4; j++) {
-                    if (caracteresFragmentos[j] == '\0') {
-                        caracteresFragmentos[j] = c;
-                        break;
-                    }
-                }
-            }
-            break;
         }
+        break;
     }
 
-    if (Clique((Rectangle){500, 530, 280, 44}) ||
-        IsKeyPressed(KEY_ENTER)) {
+    if (Clique(SETA_ETAPA1) || IsKeyPressed(KEY_ENTER))
         ConfirmarFragmentos();
-    }
 }
 
 static void AtualizarEtapa2(void)
 {
-    /* Seleciona uma peca disponivel. */
-    for (int i = 0; i < 4; i++) {
-        Rectangle r = {510.0f + i * 165.0f, 405.0f, 130.0f, 66.0f};
-        if (Clique(r) && !CaractereJaUsadoNaEtapa2(PECAS_ORDEM[i])) {
-            pecaSelecionada = i;
-            break;
+    Vector2 mouse = GetMousePosition();
+
+    /* Comeca o arraste: de uma peca da bandeja ou de uma posicao ja preenchida. */
+    if (!arrastando && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        for (int i = 0; i < 4; i++) {
+            if (CheckCollisionPointRec(mouse, RetanguloPeca(i)) &&
+                !CaractereJaUsadoNaEtapa2(PECAS_ORDEM[i])) {
+                arrastando = true;
+                arrasteCaractere = PECAS_ORDEM[i];
+                arrasteOrigem = -1;
+                break;
+            }
         }
-    }
-
-    /* Depois coloca a peca no slot escolhido. */
-    for (int pos = 0; pos < 4; pos++) {
-        Rectangle slot = {490.0f + pos * 175.0f, 250.0f, 140.0f, 76.0f};
-        if (Clique(slot)) {
-            if (posicaoRevelada[pos]) break;
-
-            if (pecaSelecionada >= 0) {
-                char c = PECAS_ORDEM[pecaSelecionada];
-                bool usada = false;
-                for (int j = 0; j < 4; j++)
-                    if (j != pos && ordem[j] == c) usada = true;
-
-                if (!usada) ordem[pos] = c;
-                pecaSelecionada = -1;
-            } else {
+        for (int pos = 0; pos < 4 && !arrastando; pos++) {
+            if (CheckCollisionPointRec(mouse, RetanguloPosicao(pos)) &&
+                ordem[pos] && !posicaoRevelada[pos]) {
+                arrastando = true;
+                arrasteCaractere = ordem[pos];
+                arrasteOrigem = pos;
                 ordem[pos] = '\0';
             }
-            break;
         }
     }
 
-    if (Clique((Rectangle){700, 525, 280, 48}) ||
-        IsKeyPressed(KEY_ENTER)) {
-        ConfirmarOrdem();
+    /* Solta a peca. */
+    if (arrastando && IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+        int alvo = -1;
+        for (int pos = 0; pos < 4; pos++)
+            if (CheckCollisionPointRec(mouse, RetanguloPosicao(pos))) alvo = pos;
+
+        if (alvo >= 0 && !posicaoRevelada[alvo]) {
+            char anterior = ordem[alvo];
+            ordem[alvo] = arrasteCaractere;
+            /* Soltar sobre outra peca troca as duas de lugar; se a peca veio da
+               bandeja, a anterior volta para a bandeja. */
+            if (anterior && arrasteOrigem >= 0) ordem[arrasteOrigem] = anterior;
+        } else if (alvo >= 0 && arrasteOrigem >= 0) {
+            /* Posicao revelada pela IA: a peca volta para onde estava. */
+            ordem[arrasteOrigem] = arrasteCaractere;
+        }
+        /* Soltar fora das posicoes: a peca volta para a bandeja. */
+        arrastando = false;
     }
+
+    if (!arrastando && (Clique(SETA_ETAPA2) || IsKeyPressed(KEY_ENTER)))
+        ConfirmarOrdem();
 }
+
 
 void Senha_Atualizar(void)
 {
@@ -393,20 +530,19 @@ void Senha_Atualizar(void)
 
     case ETAPA_POPUP_IA:
         if (Tokens_Valor() > 0) {
-            if (Clique(BOTAO_ACEITAR_IA) || IsKeyPressed(KEY_ONE))
+            if (Clique(BotaoMSN(0)) || IsKeyPressed(KEY_ONE))
                 AceitarAjudaIA();
-            else if (Clique(BOTAO_RECUSAR_IA) || IsKeyPressed(KEY_TWO))
+            else if (Clique(BotaoMSN(1)) || IsKeyPressed(KEY_TWO))
                 RecusarAjudaIA();
         } else {
-            if (Clique((Rectangle){490, 390, 300, 48}) ||
-                IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_TWO)) {
+            /* sem tokens: so da para continuar sozinha */
+            if (Clique(BotaoMSN(1)) || IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_ENTER))
                 RecusarAjudaIA();
-            }
         }
         break;
 
     case ETAPA_DICA_IA:
-        if (Clique(BOTAO_CONTINUAR_DICA) || IsKeyPressed(KEY_ENTER))
+        if (Clique(BotaoMSN(1)) || IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_ENTER))
             estado = ETAPA_ORDEM;
         break;
 
@@ -422,228 +558,181 @@ void Senha_Atualizar(void)
 
 /* ------------------------- DESENHO ------------------------- */
 
-static void DesenharEtapa1(void)
+static void Aviso(void)
 {
-    Centro("ETAPA 1 / 2: DESCUBRA OS CARACTERES", 640, 108, 21, WHITE);
-    Centro("Leia as pistas e selecione os quatro caracteres que formam a senha.",
-           640, 140, 16, COR_CLARA);
-
-    Painel((Rectangle){100, 165, 1080, 140}, "PISTAS DOS FRAGMENTOS");
-
-    for (int i = 0; i < 4; i++) {
-        Rectangle card = {125.0f + i * 265.0f, 200.0f, 245.0f, 88.0f};
-        DrawRectangleRounded(card, .12f, 8, COR_CLARA);
-        DrawRectangleRoundedLinesEx(card, .12f, 8, 2, COR_AZUL);
-        Centro(TextFormat("FRAGMENTO %c", FRAGMENTOS[i]),
-               card.x + card.width / 2, card.y + 7, 14, COR_ROSA);
-
-        const char *linha1 = "";
-        const char *linha2 = "";
-        if (i == 0) { linha1 = "Inicial de"; linha2 = "Kelly Key"; }
-        else if (i == 1) { linha1 = "Ultimo algarismo"; linha2 = "de 2007"; }
-        else if (i == 2) { linha1 = "Inicial da palavra"; linha2 = "Year"; }
-        else { linha1 = "Primeiro algarismo"; linha2 = "de 2007"; }
-
-        Centro(linha1, card.x + card.width / 2, card.y + 31, 17, COR_MARINHO);
-        Centro(linha2, card.x + card.width / 2, card.y + 55, 17, COR_MARINHO);
-    }
-
-    Painel((Rectangle){190, 325, 900, 165}, "ESCOLHA QUATRO CARACTERES");
-
-    for (int i = 0; i < 8; i++) {
-        Rectangle r = {
-            235.0f + (i % 4) * 205.0f,
-            365.0f + (i / 4) * 62.0f,
-            150.0f, 48.0f
-        };
-        bool selecionado = CaractereJaUsadoNaEtapa1(OPCOES_FRAGMENTOS[i]);
-        BotaoCaractere(r, OPCOES_FRAGMENTOS[i], true, selecionado, false);
-    }
-
-    int quantidade = QuantidadeSelecionadaEtapa1();
-    Centro(TextFormat("%d de 4 selecionados", quantidade),
-           640, 500, 15, COR_CLARA);
-
-    Rectangle confirmar = {500, 530, 280, 44};
-    DrawRectangleRounded(confirmar, .16f, 8,
-                         quantidade == 4 ? COR_AZUL_MED : Fade(COR_AZUL_MED, .65f));
-    DrawRectangleRoundedLinesEx(confirmar, .16f, 8, 1.5f, COR_AZUL);
-    Centro("CONFIRMAR", 640, 543, 18, WHITE);
-
-    if (tempoAviso > 0.0f) {
-        Centro("Os caracteres selecionados nao correspondem aos fragmentos. Tente novamente.",
-               640, 595, 14, COR_ROSA);
-    }
+    if (tempoAviso <= 0.0f) return;
+    const char *msg;
+    if (etapa == 1)
+        msg = avisoIncompleto ? "Selecione os quatro caracteres antes de confirmar."
+                              : "Os caracteres não correspondem aos fragmentos. Tente de novo.";
+    else
+        msg = avisoIncompleto ? "Preencha as quatro posições antes de confirmar."
+                              : "Senha incorreta. Revise as pistas e tente de novo.";
+    Rectangle r = {742, 520, 470, 40};
+    DrawRectangleRounded(r, .3f, 8, (Color){255, 255, 225, 255});         /* balao amarelo do XP */
+    DrawRectangleRoundedLinesEx(r, .3f, 8, 1.2f, (Color){120, 100, 40, 255});
+    Texto(msg, r.x + 14, r.y + 10, 17, COR_MARINHO);
 }
 
-static void DesenharContadorErros(void)
+static void DesenharEtapa1(void)
 {
-    Rectangle painel = {1000, 108, 205, 54};
-    DrawRectangleRounded(painel, .12f, 8, Fade(COR_MARINHO, .9f));
-    DrawRectangleRoundedLinesEx(painel, .12f, 8, 1.5f,
-                                ajudaUsada ? COR_VERDE : COR_ROSA);
+    const char *pistas[] = {
+        "FRAGMENTO A", "Inicial de Kelly Key",
+        "FRAGMENTO B", "Último algarismo de 2007",
+        "FRAGMENTO C", "Inicial da palavra Year",
+        "FRAGMENTO D", "Primeiro algarismo de 2007"
+    };
+    LadoPistas("Descubra os quatro caracteres da sua senha.", pistas, 4);
+    Perfil();
 
-    Centro(ajudaUsada ? "ERROS: 0/5" : TextFormat("ERROS: %d/5", erros),
-           1102, 113, 14, COR_CLARA);
-
-    for (int i = 0; i < SENHA_ERROS_RODADA; i++) {
-        Rectangle slot = {1020.0f + i * 34.0f, 135, 23, 17};
-        bool preenchido = !ajudaUsada && i < erros;
-        DrawRectangleRounded(slot, .2f, 6,
-                             preenchido ? COR_VERMELHO : Fade(COR_AZUL_MED, .18f));
-        DrawRectangleRoundedLinesEx(slot, .2f, 6, 1.2f,
-                                    preenchido ? COR_ROSA : COR_AZUL);
-        if (preenchido)
-            Centro("X", slot.x + slot.width / 2, slot.y + 1, 14, WHITE);
+    /* campo de senha: mostra os caracteres escolhidos, na ordem dos cliques */
+    Rectangle campo = {742, 236, 300, 40};
+    DrawRectangleRounded(campo, .15f, 6, WHITE);
+    DrawRectangleRoundedLinesEx(campo, .15f, 6, 1.5f, (Color){60, 90, 180, 255});
+    for (int i = 0; i < 4; i++) {
+        char s[2] = {caracteresFragmentos[i] ? caracteresFragmentos[i] : '?', '\0'};
+        TextoForte(s, campo.x + 16 + i * 30, campo.y + 7, 24,
+                   caracteresFragmentos[i] ? COR_MARINHO : (Color){150, 170, 220, 255});
     }
+    SetaVerde(SETA_ETAPA1);
+
+    Texto("Escolha quatro caracteres:", 742, 300, 18, Fade(WHITE, .9f));
+    for (int i = 0; i < 8; i++)
+        BotaoCaractere(RetanguloOpcao(i), OPCOES_FRAGMENTOS[i],
+                       CaractereJaUsadoNaEtapa1(OPCOES_FRAGMENTOS[i]), false);
+
+    Texto("Etapa 1 de 2", 742, 486, 16, Fade(WHITE, .75f));
+    Aviso();
 }
 
 static void DesenharEtapa2(void)
 {
-    Centro("ETAPA 2 / 2: DESCUBRA A ORDEM", 640, 108, 21, WHITE);
-    Centro("Organize os quatro caracteres na ordem correta para formar a senha.",
-           640, 143, 16, COR_CLARA);
-    DesenharContadorErros();
-
-    Painel((Rectangle){75, 175, 380, 300}, "PISTAS DE POSICIONAMENTO");
     const char *pistas[] = {
-        "1. Y aparece antes de K.",
-        "2. 2 aparece antes de 7.",
-        "3. K fica imediatamente",
-        "   depois de 2.",
-        "4. 7 ocupa a ultima",
-        "   posicao."
+        "PISTA 1", "Y aparece antes de K.",
+        "PISTA 2", "2 aparece antes de 7.",
+        "PISTA 3", "K fica imediatamente depois de 2."
     };
-    for (int i = 0; i < 6; i++)
-        DrawText(pistas[i], 100, 218 + i * 37, 18, COR_CLARA);
+    LadoPistas("Agora organize os caracteres na ordem certa.", pistas, 3);
+    Perfil();
 
-    Painel((Rectangle){470, 175, 735, 165}, "ORGANIZE OS CARACTERES");
+    /* o campo de senha vira quatro posicoes */
+    Vector2 mouse = GetMousePosition();
     for (int i = 0; i < 4; i++) {
-        float x = 490.0f + i * 175.0f;
-        Centro(TextFormat("%d", i + 1), x + 70, 218, 19, COR_AZUL_MED);
-        Rectangle slot = {x, 250, 140, 76};
-        DrawRectangleRounded(slot, .14f, 8,
-                             posicaoRevelada[i] ? Fade(COR_VERDE, .28f) : COR_CLARA);
-        DrawRectangleRoundedLinesEx(slot, .14f, 8, 2.5f,
-                                    posicaoRevelada[i] ? COR_VERDE : COR_AZUL);
-        if (ordem[i]) {
-            char s[2] = {ordem[i], '\0'};
-            Centro(s, x + 70, 265, 40, COR_MARINHO);
-        } else {
-            Centro("?", x + 70, 265, 38, COR_AZUL_MED);
-        }
+        Rectangle s = RetanguloPosicao(i);
+        bool alvo = arrastando && !posicaoRevelada[i] && CheckCollisionPointRec(mouse, s);
+        Color fundo = posicaoRevelada[i] ? (Color){214, 240, 214, 255} :
+                      alvo ? (Color){255, 225, 246, 255} : WHITE;
+        Color borda = posicaoRevelada[i] ? COR_VERDE : alvo ? COR_ROSA : (Color){60, 90, 180, 255};
+        DrawRectangleRounded(s, .14f, 6, fundo);
+        DrawRectangleRoundedLinesEx(s, .14f, 6, alvo ? 3.0f : 1.5f, borda);
+
+        char t[2] = {ordem[i] ? ordem[i] : '?', '\0'};
+        CentroForte(t, s.x + s.width / 2, s.y + 12, 30,
+                    ordem[i] ? COR_MARINHO : (Color){150, 170, 220, 255});
+
         if (posicaoRevelada[i])
-            Centro("IA", x + 70, 328, 12, COR_VERDE);
+            CentroForte("IA", s.x + s.width / 2, s.y + 62, 15, (Color){170, 240, 170, 255});
+        else
+            CentroForte(TextFormat("%d", i + 1), s.x + s.width / 2, s.y + 62, 15, Fade(WHITE, .8f));
     }
+    SetaVerde(SETA_ETAPA2);
 
-    Painel((Rectangle){470, 350, 735, 145}, "CARACTERES DISPONIVEIS");
-    for (int i = 0; i < 4; i++) {
-        Rectangle r = {510.0f + i * 165.0f, 405, 130, 66};
-        bool usado = CaractereJaUsadoNaEtapa2(PECAS_ORDEM[i]);
-        BotaoCaractere(r, PECAS_ORDEM[i], !usado,
-                       pecaSelecionada == i, usado);
-    }
+    Texto("Arraste os caracteres para as posições.", 742, 330, 18, Fade(WHITE, .9f));
+    for (int i = 0; i < 4; i++)
+        BotaoCaractere(RetanguloPeca(i), PECAS_ORDEM[i], false,
+                       CaractereJaUsadoNaEtapa2(PECAS_ORDEM[i]));
+    Texto("Para tirar um caractere, arraste-o para fora.", 742, 432, 16, Fade(WHITE, .75f));
+    Texto("Etapa 2 de 2", 742, 458, 16, Fade(WHITE, .75f));
 
     if (mostrarDicaIA) {
-        DrawRectangleRounded((Rectangle){75, 495, 380, 90}, .08f, 8,
-                             Fade(COR_MARINHO, .9f));
-        DrawRectangleRoundedLinesEx((Rectangle){75, 495, 380, 90},
-                                    .08f, 8, 2, COR_VERDE);
-        DrawText("AJUDA DA IA", 95, 507, 15, COR_VERDE);
-        DrawText("1a posicao: Y", 95, 533, 15, COR_CLARA);
-        DrawText("3a posicao: K", 95, 555, 15, COR_CLARA);
+        Rectangle caixa = {90, 530, 420, 62};
+        DrawRectangleRounded(caixa, .2f, 8, Fade(XP_AZUL_ESC, .55f));
+        DrawRectangleRoundedLinesEx(caixa, .2f, 8, 1.5f, (Color){170, 240, 170, 255});
+        if (texIA.id != 0)
+            DesenharTextura(texIA, (Rectangle){0, 0, (float)texIA.width, (float)texIA.height},
+                            (Rectangle){caixa.x + 10, caixa.y + 7, 48, 48});
+        TextoForte("Ajuda da IA", caixa.x + 68, caixa.y + 8, 15, (Color){170, 240, 170, 255});
+        Texto("1ª posição: Y      3ª posição: K", caixa.x + 68, caixa.y + 30, 18, WHITE);
     }
 
-    Rectangle confirmar = {700, 525, 280, 48};
-    DrawRectangleRounded(confirmar, .16f, 8, COR_AZUL_MED);
-    DrawRectangleRoundedLinesEx(confirmar, .16f, 8, 1.5f, COR_AZUL);
-    Centro("CONFIRMAR", confirmar.x + confirmar.width / 2,
-           confirmar.y + 13, 18, WHITE);
+    Aviso();
 
-    if (tempoAviso > 0.0f) {
-        const char *mensagem = ajudaUsada
-            ? "Sequencia incorreta. Revise as pistas e tente novamente."
-            : "Sequencia incorreta. Revise as pistas e tente novamente.";
-        Centro(mensagem, 835, 590, 14, COR_ROSA);
+    /* a peca arrastada vai por cima de tudo, presa ao mouse */
+    if (arrastando) {
+        Rectangle r = {mouse.x - 33, mouse.y - 29, 66, 58};
+        DrawRectangleRounded((Rectangle){r.x + 4, r.y + 6, r.width, r.height},
+                             .16f, 6, Fade(BLACK, .3f));
+        BotaoCaractere(r, arrasteCaractere, true, false);
     }
+}
+
+/* Janela de MSN da IA, no mesmo formato da escolha da IA no Ato 2 */
+static void JanelaMSN(void)
+{
+    DrawRectangle(0, 0, 1280, 720, Fade(BLACK, .45f));
+    Rectangle j = JANELA_MSN;
+    DrawRectangleRounded(j, .04f, 8, (Color){232, 240, 250, 250});
+    DrawRectangleRounded((Rectangle){j.x, j.y, j.width, 44}, .3f, 8, COR_AZUL);
+    DrawRectangleRoundedLinesEx(j, .04f, 8, 1.5f, COR_MARINHO);
+    DrawCircle((int)j.x + 26, (int)j.y + 22, 8, COR_VERDE);
+    Texto("IA diz:", j.x + 44, j.y + 10, 22, WHITE);
+    if (texIA.id != 0)
+        DesenharTextura(texIA, (Rectangle){0, 0, (float)texIA.width, (float)texIA.height},
+                        (Rectangle){j.x + 24, j.y + 64, 56, 56});
+}
+
+static void BotaoEscolha(int i, const char *rotulo)
+{
+    /* igual as opcoes do Ato 2: azul-marinho, rosa com o mouse por cima */
+    Rectangle r = BotaoMSN(i);
+    bool sobre = CheckCollisionPointRec(GetMousePosition(), r);
+    DrawRectangleRounded(r, .3f, 8, sobre ? COR_ROSA_HOV : (Color){29, 38, 96, 235});
+    DrawRectangleRoundedLines(r, .3f, 8, WHITE);
+    int largura = UiMeasureText(rotulo, 24);
+    Texto(rotulo, r.x + (r.width - largura) / 2, r.y + 18, 24, WHITE);
 }
 
 static void DesenharPopupIA(void)
 {
-    DrawRectangle(0, 0, 1280, 720, Fade(BLACK, .58f));
-    DrawRectangleRounded(POPUP_IA, .06f, 10, (Color){13, 27, 64, 250});
-    DrawRectangleRoundedLinesEx(POPUP_IA, .06f, 10, 3, COR_ROSA);
-    DrawRectangleRounded((Rectangle){350, 238, 580, 7}, .5f, 8, COR_AZUL);
-
-    Centro("ASSISTENTE DA LIA", 640, 265, 25, COR_CLARA);
-    Centro("Voce errou cinco vezes. Quer uma ajuda para continuar?",
-           640, 315, 18, COR_CLARA);
-
+    JanelaMSN();
+    Rectangle j = JANELA_MSN;
+    /* SENHA_ERROS_RODADA vale 3. Se mudar, ajuste o texto abaixo. */
+    Texto("Você errou três vezes.", j.x + 96, j.y + 68, 24, COR_MARINHO);
     if (Tokens_Valor() > 0) {
-        DrawRectangleRounded(BOTAO_ACEITAR_IA, .16f, 8, COR_CIANO);
-        Centro("USAR AJUDA (-1 TOKEN)", 500, 403, 17, COR_MARINHO);
-
-        DrawRectangleRounded(BOTAO_RECUSAR_IA, .16f, 8, COR_AZUL_MED);
-        Centro("CONTINUAR SEM AJUDA", 780, 403, 17, COR_MARINHO);
-        Centro(TextFormat("Tokens disponiveis: %d/3", Tokens_Valor()),
-               640, 460, 15, COR_AZUL_MED);
+        Texto("Quer uma ajuda?", j.x + 96, j.y + 98, 24, COR_MARINHO);
+        BotaoEscolha(0, "1   Usar a ajuda");
+        BotaoEscolha(1, "2   Continuar sozinha");
     } else {
-        Centro("A IA esta sem energia no momento.", 640, 360, 17, COR_ROSA);
-        DrawRectangleRounded((Rectangle){490, 390, 300, 48}, .16f, 8, COR_AZUL_MED);
-        Centro("CONTINUAR SOZINHA", 640, 403, 17, COR_MARINHO);
+        Texto("Estou sem energia para ajudar agora.", j.x + 96, j.y + 98, 24, COR_MARINHO);
+        BotaoEscolha(1, "1   Continuar sozinha");
     }
 }
 
 static void DesenharDicaIA(void)
 {
-    DrawRectangle(0, 0, 1280, 720, Fade(BLACK, .66f));
-
-    /* Modal centralizado, com espacamento uniforme entre titulo, dicas e acao. */
-    Rectangle painel = {310, 165, 660, 395};
-    DrawRectangleRounded(painel, .06f, 10, (Color){13, 27, 64, 252});
-    DrawRectangleRoundedLinesEx(painel, .06f, 10, 3, COR_ROSA);
-
-    DrawCircle(390, 235, 29, COR_CIANO);
-    Centro("IA", 390, 221, 25, COR_MARINHO);
-    DrawText("ASSISTENTE DA LIA", 435, 217, 26, COR_CLARA);
-    DrawText("Usei uma carga para revelar duas posicoes:", 385, 282, 18, COR_CLARA);
-
-    Rectangle dica1 = {385, 330, 510, 54};
-    Rectangle dica2 = {385, 400, 510, 54};
-    DrawRectangleRounded(dica1, .12f, 8, Fade(COR_AZUL, .28f));
-    DrawRectangleRounded(dica2, .12f, 8, Fade(COR_AZUL, .28f));
-    DrawRectangleRoundedLinesEx(dica1, .12f, 8, 1.2f, COR_AZUL);
-    DrawRectangleRoundedLinesEx(dica2, .12f, 8, 1.2f, COR_AZUL);
-
-    Centro("1a posicao: Y", 640, 345, 21, COR_CIANO);
-    Centro("3a posicao: K", 640, 415, 21, COR_CIANO);
-
-    DrawRectangleRounded(BOTAO_CONTINUAR_DICA, .16f, 8, COR_CIANO);
-    Centro("CONTINUAR", 640, 490, 19, COR_MARINHO);
+    JanelaMSN();
+    Rectangle j = JANELA_MSN;
+    Texto("Revelei duas posições para você:", j.x + 96, j.y + 68, 24, COR_MARINHO);
+    TextoForte("1ª posição: Y        3ª posição: K", j.x + 96, j.y + 112, 24, COR_ROSA);
+    BotaoEscolha(1, "1   Continuar");
 }
 
 void Senha_Desenhar(void)
 {
+    CarregarTexturas();
     Fundo();
 
     if (etapa == 1) DesenharEtapa1();
     else DesenharEtapa2();
 
     if (estado == ETAPA_ACERTOU || estado == ETAPA_FIM) {
-        DrawRectangle(0, 0, 1280, 720, Fade(BLACK, .62f));
-        Rectangle painel = {250, 245, 780, 220};
-        DrawRectangleRounded(painel, .08f, 10, (Color){13, 27, 64, 245});
-        DrawRectangleRoundedLinesEx(painel, .08f, 10, 3, COR_AZUL);
-        DrawRectangleRounded((Rectangle){270, 265, 740, 8}, .5f, 8, COR_ROSA);
-        Centro("ACESSO LIBERADO!", 640, 315, 40, COR_VERDE);
-        Centro("A senha foi descoberta.", 640, 380, 22, COR_CLARA);
-        Centro("O computador esta desbloqueado.", 640, 415, 20, WHITE);
+        DrawRectangle(0, 0, 1280, 720, Fade(XP_AZUL_ESC, .85f));
+        CentroForte("bem-vinda", 640, 300, 64, WHITE);
+        Centro("Acesso liberado.", 640, 390, 24, Fade(WHITE, .9f));
     }
 
     if (estado == ETAPA_POPUP_IA) DesenharPopupIA();
     if (estado == ETAPA_DICA_IA) DesenharDicaIA();
-
-    Centro("ESC: sair do desafio", 640, 685, 15, COR_AZUL_MED);
 }
 
 bool Senha_Concluida(void)
