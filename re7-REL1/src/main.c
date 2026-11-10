@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "barra_tokens.h"
 #include "senha.h"
+#include "dev_mode.h"       // modo desenvolvedor: so no build -Dev (senao nao faz nada)
 
 int main(void)
 {
@@ -37,7 +38,11 @@ int main(void)
 
     while (!WindowShouldClose() && !game.shouldExit)
     {
-        UpdateGame(&game);
+        DevMode_Atualizar(&game);
+
+        // um clique no painel de desenvolvedor nao chega ao jogo
+        if (!DevMode_CapturouEntrada())
+            UpdateGame(&game);
 
         BeginDrawing();
 
@@ -45,6 +50,7 @@ int main(void)
 
         DrawGame(&game, &assets);
         DrawPauseControls(&game);
+        DevMode_Desenhar(&game);
 
         EndDrawing();
     }
@@ -69,5 +75,10 @@ int main(void)
 Para rodar (sempre da raiz do projeto):
 
 .\re7.exe
+
+Build de desenvolvimento, com o painel de testes (F10):
+
+.\build.ps1 -Dev
+.\re7_dev.exe
 
 */
