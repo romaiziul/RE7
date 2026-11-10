@@ -1894,7 +1894,7 @@ static bool CenaDoAto3(SceneID cena)
     return cena >= SCENE_ATO3_ABERTURA && cena < SCENE_COUNT;
 }
 
-static void DesenharCenaAto3(GameState *game, const Scene *scene, Dialogue dialogue)
+static void DesenharCenaAto3(GameState *game, Assets *assets, const Scene *scene, Dialogue dialogue)
 {
     // tempo desde que a cena comecou (o PC pisca no comeco da reserva,
     // a camera se aproxima da Lia na conclusao)
@@ -1918,17 +1918,24 @@ static void DesenharCenaAto3(GameState *game, const Scene *scene, Dialogue dialo
     float foco = tempoNaCena / 1.2f;
     if (foco > 1.0f) foco = 1.0f;
 
+    // Expressao da Lia no pulpito: a da ultima fala dela. Sem expressao
+    // marcada (ou "preocupada", que so existe na Lia de 2026), ela fica
+    // pensativa enquanto esta nervosa.
+    Pose poseLia = PoseDe(scene, game->dialogueIndex, "Lia");
+    if (poseLia == POSE_PREOCUPADA || (poseLia == POSE_PADRAO && antesDaEscolha))
+        poseLia = POSE_PENSATIVA;
+
     Ato3Cena cena = {
         .pcOnline = !Tokens_IAOffline(),
         .pcPiscando = (c == SCENE_ATO3_RESERVA && tempoNaCena < 1.2f),
         // cenario 1: a plateia aplaude no fim, mas a Lia nao sorri
         .aplausos = conclusao || (iaLeu && game->dialogueIndex >= scene->dialogueCount - 1),
-        .professoraSorri = conclusao,
         .foco = conclusao ? foco * (2.0f - foco) : 0.0f,
-        .nervosismo = antesDaEscolha ? 1.0f : ((c == SCENE_ATO3_AJUDA || c == SCENE_ATO3_SOZINHA) ? 0.6f : 0.0f)
+        .nervosismo = antesDaEscolha ? 1.0f : ((c == SCENE_ATO3_AJUDA || c == SCENE_ATO3_SOZINHA) ? 0.6f : 0.0f),
+        .lia = TexturaLia(assets, 2007, poseLia)
     };
 
-    Ato3_DesenharCenario(&cena);
+    Ato3_DesenharCenario(&cena, assets);
 
     // Papel: aparece depois da fala da Lia; na conclusao a camera fica na Lia.
     bool mostrarPapel = !conclusao && !(c == SCENE_ATO3_ABERTURA && game->dialogueIndex < 1);
@@ -1940,8 +1947,8 @@ static void DesenharCenaAto3(GameState *game, const Scene *scene, Dialogue dialo
         float nitidez[3] = { n, n, n };
 
         // a esquerda do palco: a Lia e o PC do pulpito continuam visiveis
-        Rectangle papel = {190, 165, 400, 232};
-        Ato3_DesenharPapel(papel, 19, nitidez, -1, (Vector2){0, 0});
+        Rectangle papel = {70, 175, 400, 232};
+        Ato3_DesenharPapel(papel, 19, nitidez, -1, (Vector2){0, 0}, assets->papelDiscurso);
 
         if (n < 1.0f)
             UiDrawText("As palavras parecem embaralhadas...", (int)papel.x + 27,
@@ -2240,7 +2247,7 @@ void DrawGame(
 
         if (CenaDoAto3(game->currentScene))
         {
-            DesenharCenaAto3(game, &scene, dialogue);
+            DesenharCenaAto3(game, assets, &scene, dialogue);
             return;
         }
 

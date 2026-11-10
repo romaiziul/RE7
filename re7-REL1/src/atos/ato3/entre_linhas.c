@@ -263,15 +263,16 @@ void DrawAto3EntreLinhas(Assets *assets)
     bool concluiu = desafio.fase >= EL_FASE_CONCLUSAO;
 
     // auditorio ao fundo, escurecido
+    // (a Lia aparece em primeiro plano a direita, entao nao entra no palco)
     Ato3Cena cena = {
         .pcOnline = !Tokens_IAOffline(),
         .pcPiscando = false,
         .aplausos = concluiu,
-        .professoraSorri = concluiu,
         .foco = 0.0f,
-        .nervosismo = (float)(ATO3_ETAPAS - recuperadas) / ATO3_ETAPAS
+        .nervosismo = 0.0f,
+        .lia = (Texture2D){0}
     };
-    Ato3_DesenharCenario(&cena);
+    Ato3_DesenharCenario(&cena, assets);
     DrawRectangle(0, 0, 1280, 720, Fade(BLACK, concluiu ? 0.35f : 0.55f));
 
     DesenharCabecalho();
@@ -302,7 +303,7 @@ void DrawAto3EntreLinhas(Assets *assets)
     if (desafio.fase == EL_FASE_ERRO_AMIGO)
         DesenharRetrato(assets->amigo[0], 440.0f, -10.0f, 280.0f, false);
 
-    Ato3_DesenharPapel(PAPEL, 27, nitidez, destaque, tremor);
+    Ato3_DesenharPapel(PAPEL, 27, nitidez, destaque, tremor, assets->papelDiscurso);
 
     const Ato3Etapa *etapa = Ato3_Etapa(desafio.modo, desafio.etapa);
 

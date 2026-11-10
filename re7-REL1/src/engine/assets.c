@@ -89,6 +89,17 @@ void LoadAssets(Assets *assets)
     assets->pcBoot = LoadTexture("assets/ato2/ato2_doors_boot.png");
     assets->pcDesktop = LoadTexture("assets/ato2/ato2_doors_xp.png");
     assets->pcPerfil = LoadTexture("assets/ato2/ato2_cg_perfil.png");
+
+
+    // ATO 3
+
+    assets->bgAuditorio = LoadTexture("assets/ato3/ato3_auditorio.png");
+    assets->monitorCrt = LoadTexture("assets/ato3/ato3_monitor_crt.png");
+    assets->papelDiscurso = LoadTexture("assets/ato3/ato3_papel_discurso.png");
+
+    SetTextureFilter(assets->bgAuditorio, TEXTURE_FILTER_BILINEAR);
+    SetTextureFilter(assets->monitorCrt, TEXTURE_FILTER_BILINEAR);
+    SetTextureFilter(assets->papelDiscurso, TEXTURE_FILTER_BILINEAR);
 }
 
 
@@ -119,6 +130,9 @@ void UnloadAssets(Assets *assets)
     UnloadTexture(assets->pcBoot);
     UnloadTexture(assets->pcDesktop);
     UnloadTexture(assets->pcPerfil);
+    UnloadTexture(assets->bgAuditorio);
+    UnloadTexture(assets->monitorCrt);
+    UnloadTexture(assets->papelDiscurso);
     UnloadTexture(assets->logo);
     UnloadTexture(assets->iaStar);
 }
