@@ -215,10 +215,10 @@ void BarraTokens_Desenhar(float x, float y)
     DrawCircleV(st, 6, offline ? COR_CINZA : COR_VERDE);
 
     // titulo, status e contagem (sem caixa: texto claro com sombra)
-    TextoContornado("Tokens da", x + 72, y + 6, 15, WHITE, true);
-    TextoContornado("IA", x + 72 + UiMeasureTextEmphasis("Tokens da ", 15), y + 6, 15, offline ? WHITE : (Color){255,150,230,255}, true);
+    TextoContornado("Tokens da", x + 72, y + 4, 19, WHITE, true);
+    TextoContornado("IA", x + 72 + UiMeasureTextEmphasis("Tokens da ", 19), y + 4, 19, offline ? WHITE : (Color){255,150,230,255}, true);
     const char *status = offline ? "offline" : "online";
-    TextoContornado(status, x + BARRA_LARGURA - 18 - UiMeasureTextEmphasis(status, 15), y + 6, 15,
+    TextoContornado(status, x + BARRA_LARGURA - 18 - UiMeasureTextEmphasis(status, 19), y + 4, 19,
        offline ? (Color){200,200,210,255} : (Color){140,230,150,255}, true);
 
     // bateria unica dividida em 3
@@ -226,5 +226,5 @@ void BarraTokens_Desenhar(float x, float y)
     DesenharBateria(corpo, valor, offline);
 
     const char *txt = TextFormat("%d/%d", valor, TOKENS_MAX);
-    TextoContornado(txt, corpo.x + corpo.width + 18, corpo.y + 7, 17, WHITE, true);
+    TextoContornado(txt, corpo.x + corpo.width + 18, corpo.y + 5, 20, WHITE, true);
 }

@@ -185,7 +185,7 @@ static void Fundo(void)
     TextoForte("LIA", 40 + UiMeasureTextEmphasis("PC da ", 26), 28, 26, COR_ROSA_TXT);
 
     /* rodape: so a frase. O canto esquerdo fica livre para a engrenagem de pausa do game.c. */
-    Texto("Depois de entrar, a IA estará esperando por você.", 800, 668, 16, Fade(WHITE, .85f));
+    Texto("Depois de entrar, a IA estará esperando por você.", 760, 664, 19, Fade(WHITE, .85f));
 }
 
 /* Lado esquerdo: logo, boas-vindas e as pistas em caixinhas */
@@ -197,14 +197,20 @@ static void LadoPistas(const char *subtitulo, const char **linhas, int quantidad
                         (Rectangle){90, 120, 128, altura});
     }
     TextoForte("Bem-vinda", 236, 150, 38, WHITE);
-    Texto(subtitulo, 238, 198, 18, Fade(WHITE, .9f));
+    if (strcmp(subtitulo, "Descubra os quatro caracteres da sua senha.") == 0) {
+    Texto("Descubra os quatro caracteres", 238, 198, 20, Fade(WHITE, .9f));
+    Texto("da sua senha.", 238, 224, 20, Fade(WHITE, .9f));
+    } else {
+    Texto("Agora organize os caracteres", 238, 198, 20, Fade(WHITE, .9f));
+    Texto("na ordem certa.", 238, 224, 20, Fade(WHITE, .9f));
+    }
 
     for (int i = 0; i < quantidade; i++) {
         Rectangle r = {90, 290.0f + i * 76.0f, 420, 66};
         DrawRectangleRounded(r, .18f, 8, Fade(XP_AZUL_ESC, .45f));
         DrawRectangleRoundedLinesEx(r, .18f, 8, 1.2f, Fade(WHITE, .5f));
-        Texto(linhas[2 * i], r.x + 16, r.y + 10, 15, COR_ROSA_TXT);
-        Texto(linhas[2 * i + 1], r.x + 16, r.y + 30, 20, WHITE);
+        Texto(linhas[2 * i], r.x + 16, r.y + 8, 18, COR_ROSA_TXT);
+        Texto(linhas[2 * i + 1], r.x + 16, r.y + 30, 23, WHITE);
     }
 }
 
@@ -220,7 +226,7 @@ static void Perfil(void)
     DesenharTextura(texLia, (Rectangle){170, 140, 660, 660}, foto);
 
     TextoForte("Lia", 740, 160, 34, WHITE);
-    Texto("Digite sua senha:", 742, 206, 18, Fade(WHITE, .9f));
+    Texto("Digite sua senha:", 742, 206, 22, Fade(WHITE, .9f));
 }
 
 static void SetaVerde(Rectangle b)
@@ -571,7 +577,7 @@ static void Aviso(void)
     Rectangle r = {742, 520, 470, 40};
     DrawRectangleRounded(r, .3f, 8, (Color){255, 255, 225, 255});         /* balao amarelo do XP */
     DrawRectangleRoundedLinesEx(r, .3f, 8, 1.2f, (Color){120, 100, 40, 255});
-    Texto(msg, r.x + 14, r.y + 10, 17, COR_MARINHO);
+    Texto(msg, r.x + 14, r.y + 8, 20, COR_MARINHO);
 }
 
 static void DesenharEtapa1(void)
@@ -596,12 +602,12 @@ static void DesenharEtapa1(void)
     }
     SetaVerde(SETA_ETAPA1);
 
-    Texto("Escolha quatro caracteres:", 742, 300, 18, Fade(WHITE, .9f));
+    Texto("Escolha quatro caracteres:", 742, 300, 22, Fade(WHITE, .9f));
     for (int i = 0; i < 8; i++)
         BotaoCaractere(RetanguloOpcao(i), OPCOES_FRAGMENTOS[i],
                        CaractereJaUsadoNaEtapa1(OPCOES_FRAGMENTOS[i]), false);
 
-    Texto("Etapa 1 de 2", 742, 486, 16, Fade(WHITE, .75f));
+    Texto("Etapa 1 de 2", 742, 486, 19, Fade(WHITE, .85f));
     Aviso();
 }
 
@@ -631,28 +637,26 @@ static void DesenharEtapa2(void)
                     ordem[i] ? COR_MARINHO : (Color){150, 170, 220, 255});
 
         if (posicaoRevelada[i])
-            CentroForte("IA", s.x + s.width / 2, s.y + 62, 15, (Color){170, 240, 170, 255});
-        else
-            CentroForte(TextFormat("%d", i + 1), s.x + s.width / 2, s.y + 62, 15, Fade(WHITE, .8f));
+            CentroForte("IA", s.x + s.width / 2, s.y + 62, 18, (Color){170, 240, 170, 255});
     }
     SetaVerde(SETA_ETAPA2);
 
-    Texto("Arraste os caracteres para as posições.", 742, 330, 18, Fade(WHITE, .9f));
+    Texto("Arraste os caracteres para as posições.", 742, 330, 22, Fade(WHITE, .9f));
     for (int i = 0; i < 4; i++)
         BotaoCaractere(RetanguloPeca(i), PECAS_ORDEM[i], false,
                        CaractereJaUsadoNaEtapa2(PECAS_ORDEM[i]));
-    Texto("Para tirar um caractere, arraste-o para fora.", 742, 432, 16, Fade(WHITE, .75f));
-    Texto("Etapa 2 de 2", 742, 458, 16, Fade(WHITE, .75f));
+    Texto("Para tirar um caractere, arraste-o para fora.", 742, 432, 19, Fade(WHITE, .85f));
+    Texto("Etapa 2 de 2", 742, 460, 19, Fade(WHITE, .85f));
 
     if (mostrarDicaIA) {
-        Rectangle caixa = {90, 530, 420, 62};
+        Rectangle caixa = {90, 520, 420, 82};
         DrawRectangleRounded(caixa, .2f, 8, Fade(XP_AZUL_ESC, .55f));
         DrawRectangleRoundedLinesEx(caixa, .2f, 8, 1.5f, (Color){170, 240, 170, 255});
         if (texIA.id != 0)
             DesenharTextura(texIA, (Rectangle){0, 0, (float)texIA.width, (float)texIA.height},
-                            (Rectangle){caixa.x + 10, caixa.y + 7, 48, 48});
-        TextoForte("Ajuda da IA", caixa.x + 68, caixa.y + 8, 15, (Color){170, 240, 170, 255});
-        Texto("1ª posição: Y      3ª posição: K", caixa.x + 68, caixa.y + 30, 18, WHITE);
+                            (Rectangle){caixa.x + 10, caixa.y + 14, 54, 54});
+        TextoForte("Ajuda da IA", caixa.x + 72, caixa.y + 8, 20, (Color){170, 240, 170, 255});
+        Texto("1ª posição: Y      3ª posição: K", caixa.x + 72, caixa.y + 38, 22, WHITE);
     }
 
     Aviso();
@@ -675,7 +679,7 @@ static void JanelaMSN(void)
     DrawRectangleRounded((Rectangle){j.x, j.y, j.width, 44}, .3f, 8, COR_AZUL);
     DrawRectangleRoundedLinesEx(j, .04f, 8, 1.5f, COR_MARINHO);
     DrawCircle((int)j.x + 26, (int)j.y + 22, 8, COR_VERDE);
-    Texto("IA diz:", j.x + 44, j.y + 10, 22, WHITE);
+    Texto("IA diz:", j.x + 44, j.y + 8, 24, WHITE);
     if (texIA.id != 0)
         DesenharTextura(texIA, (Rectangle){0, 0, (float)texIA.width, (float)texIA.height},
                         (Rectangle){j.x + 24, j.y + 64, 56, 56});
@@ -688,8 +692,8 @@ static void BotaoEscolha(int i, const char *rotulo)
     bool sobre = CheckCollisionPointRec(GetMousePosition(), r);
     DrawRectangleRounded(r, .3f, 8, sobre ? COR_ROSA_HOV : (Color){29, 38, 96, 235});
     DrawRectangleRoundedLines(r, .3f, 8, WHITE);
-    int largura = UiMeasureText(rotulo, 24);
-    Texto(rotulo, r.x + (r.width - largura) / 2, r.y + 18, 24, WHITE);
+    int largura = UiMeasureText(rotulo, 28);
+    Texto(rotulo, r.x + (r.width - largura) / 2, r.y + 15, 28, WHITE);
 }
 
 static void DesenharPopupIA(void)
@@ -697,14 +701,14 @@ static void DesenharPopupIA(void)
     JanelaMSN();
     Rectangle j = JANELA_MSN;
     /* SENHA_ERROS_RODADA vale 3. Se mudar, ajuste o texto abaixo. */
-    Texto("Você errou três vezes.", j.x + 96, j.y + 68, 24, COR_MARINHO);
+    Texto("Você errou três vezes.", j.x + 96, j.y + 68, 28, COR_MARINHO);
     if (Tokens_Valor() > 0) {
-        Texto("Quer uma ajuda?", j.x + 96, j.y + 98, 24, COR_MARINHO);
-        BotaoEscolha(0, "1   Usar a ajuda");
-        BotaoEscolha(1, "2   Continuar sozinha");
+        Texto("Quer uma ajuda?", j.x + 96, j.y + 102, 28, COR_MARINHO);
+        BotaoEscolha(0, "Usar a ajuda");
+        BotaoEscolha(1, "Continuar sozinha");
     } else {
-        Texto("Estou sem energia para ajudar agora.", j.x + 96, j.y + 98, 24, COR_MARINHO);
-        BotaoEscolha(1, "1   Continuar sozinha");
+        Texto("Estou sem energia para ajudar agora.", j.x + 96, j.y + 102, 27, COR_MARINHO);
+        BotaoEscolha(1, "Continuar sozinha");
     }
 }
 
@@ -712,9 +716,9 @@ static void DesenharDicaIA(void)
 {
     JanelaMSN();
     Rectangle j = JANELA_MSN;
-    Texto("Revelei duas posições para você:", j.x + 96, j.y + 68, 24, COR_MARINHO);
-    TextoForte("1ª posição: Y        3ª posição: K", j.x + 96, j.y + 112, 24, COR_ROSA);
-    BotaoEscolha(1, "1   Continuar");
+    Texto("Revelei duas posições para você:", j.x + 96, j.y + 68, 28, COR_MARINHO);
+    TextoForte("1ª posição: Y        3ª posição: K", j.x + 96, j.y + 116, 28, COR_ROSA);
+    BotaoEscolha(1, "Continuar");
 }
 
 void Senha_Desenhar(void)

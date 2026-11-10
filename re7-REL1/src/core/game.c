@@ -830,7 +830,7 @@ static void DesenharEscolha(GameState *game)
     if (game->choice == ESCOLHA_IA)
     {
         DesenharPopupMSN();
-        UiDrawText(e->pergunta, 340, 175, 28, (Color){ 29, 38, 96, 255 });
+        UiDrawText(e->pergunta, 340, 175, 32, (Color){ 29, 38, 96, 255 });
     }
     else
     {
@@ -851,10 +851,10 @@ static void DesenharEscolha(GameState *game)
         DrawRectangleRounded(r, 0.3f, 8, fundo);
         DrawRectangleRoundedLines(r, 0.3f, 8, WHITE);
 
-        const char *texto = TextFormat("%d   %s", i + 1, e->opcoes[i]);
-        int larguraTexto = UiMeasureText(texto, 26);
+        const char *texto = e->opcoes[i];
+        int larguraTexto = UiMeasureText(texto, 30);
 
-        UiDrawText(texto, (int)(r.x + (r.width - larguraTexto) / 2.0f), (int)r.y + 20, 26, WHITE);
+        UiDrawText(texto, (int)(r.x + (r.width - larguraTexto) / 2.0f), (int)r.y + 18, 30, WHITE);
     }
 }
 
