@@ -91,10 +91,45 @@ Scene GetScene(SceneID id)
         case SCENE_ATO2_CG_ENSAIO:
             return (Scene){ ato2CgEnsaioDialogues, GetAto2CgEnsaioCount(), SCENE_ATO2_CG_FRENTE_ESCOLA };
 
+        // Barra em 0 no fim do Ato 2: o Ato 3 comeca com o token de reserva
+        // (roteiro do Ato 2 e do Ato 3). Antes ia direto para o epilogo.
         case SCENE_ATO2_CG_PROFESSORA_SEM_IA:
-            return (Scene){ ato2CgProfessoraSemIADialogues, GetAto2CgProfessoraSemIACount(), SCENE_EPILOGUE };
+            return (Scene){ ato2CgProfessoraSemIADialogues, GetAto2CgProfessoraSemIACount(), SCENE_ATO3_ABERTURA };
 
-        // ---------------- Epilogo (provisorio) ----------------
+        // ---------------- Ato 3 ----------------
+        // A escolha, o desafio e os finais estao no game.c (FimDaCena).
+
+        case SCENE_ATO3_ABERTURA:
+            return (Scene){ ato3AberturaDialogues, GetAto3AberturaCount(), SCENE_ATO3_OFERTA };
+
+        case SCENE_ATO3_RESERVA:
+            return (Scene){ ato3ReservaDialogues, GetAto3ReservaCount(), SCENE_ATO3_OFERTA };
+
+        case SCENE_ATO3_OFERTA:
+            return (Scene){ ato3OfertaDialogues, GetAto3OfertaCount(), SCENE_ATO3_OFERTA };
+
+        case SCENE_ATO3_IA_LE:
+            return (Scene){ ato3IaLeDialogues, GetAto3IaLeCount(), SCENE_PRESENT };
+
+        case SCENE_ATO3_IA_LE_IA_ESCREVEU:
+            return (Scene){ ato3IaLeIaEscreveuDialogues, GetAto3IaLeIaEscreveuCount(), SCENE_PRESENT };
+
+        case SCENE_ATO3_AJUDA:
+            return (Scene){ ato3AjudaDialogues, GetAto3AjudaCount(), SCENE_ATO3_CONCLUSAO };
+
+        case SCENE_ATO3_SOZINHA:
+            return (Scene){ ato3SozinhaDialogues, GetAto3SozinhaCount(), SCENE_ATO3_CONCLUSAO };
+
+        case SCENE_ATO3_CONCLUSAO:
+            return (Scene){ ato3ConclusaoDialogues, GetAto3ConclusaoCount(), SCENE_ATO3_ETAPA_CONCLUIDA };
+
+        case SCENE_ATO3_CONCLUSAO_IA_ESCREVEU:
+            return (Scene){ ato3ConclusaoIaEscreveuDialogues, GetAto3ConclusaoIaEscreveuCount(), SCENE_ATO3_ETAPA_CONCLUIDA };
+
+        case SCENE_ATO3_ETAPA_CONCLUIDA:
+            return (Scene){ ato3EtapaConcluidaDialogues, GetAto3EtapaConcluidaCount(), SCENE_EPILOGUE };
+
+        // ---------------- Epilogo ----------------
 
         case SCENE_EPILOGUE:
             return (Scene){ epilogueDialogues, GetEpilogueDialogueCount(), SCENE_PRESENT };

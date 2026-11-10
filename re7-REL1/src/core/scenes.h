@@ -36,13 +36,21 @@ typedef enum
     SCENE_ATO2_CG_CASA_NOITE, // imagem provisoria: treinando em casa, de noite
     SCENE_ATO2_CG_FRENTE_ESCOLA, // imagem provisoria: frente da escola, de dia
 
-    // ---- Epilogo (provisorio: o Ato 3 ainda nao foi feito) ----
+    // ---- Epilogo (so com 1 token ou mais no fim do Ato 3) ----
     SCENE_EPILOGUE,
 
-    // Ato 3.
-    SCENE_ATO3_ABERTURA,
-    SCENE_ATO3_RESERVA,
-    SCENE_ATO3_OFERTA,
+    // ---- Ato 3 ----
+    // (novas cenas sempre no fim da lista: o save guarda o numero da cena)
+    SCENE_ATO3_ABERTURA,        // auditorio: a Lia nao consegue ler o papel
+    SCENE_ATO3_RESERVA,         // barra em 0: a IA volta com 1 token (uma unica vez)
+    SCENE_ATO3_OFERTA,          // a IA oferece ajuda (depois: escolha do papel)
+    SCENE_ATO3_IA_LE,           // cenario 1: a IA le o papel (final ruim)
+    SCENE_ATO3_IA_LE_IA_ESCREVEU, // cenario 1, se a IA escreveu o discurso no Ato 2
+    SCENE_ATO3_AJUDA,           // cenario 2: tirar uma opcao errada (depois: desafio)
+    SCENE_ATO3_SOZINHA,         // cenario 3: tentar sozinha (depois: desafio)
+    SCENE_ATO3_CONCLUSAO,       // depois do desafio: a plateia aplaude
+    SCENE_ATO3_CONCLUSAO_IA_ESCREVEU, // depois do desafio, se a IA escreveu o discurso
+    SCENE_ATO3_ETAPA_CONCLUIDA, // barra em 1 ou mais: "Etapa concluida" e epilogo
 
     SCENE_COUNT 
 

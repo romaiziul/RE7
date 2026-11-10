@@ -15,6 +15,9 @@
 #include <stdio.h>
 #include <string.h>
 #include "ato3.h"
+#include "ato3_logica.h"
+#include "entre_linhas.h"
+#include "story_ato3.h"
 
 
 // =====================================================
@@ -58,21 +61,28 @@ static void DesenharFundo(void)
 
 
 // =====================================================
-// SAVE / LOAD (arquivo de texto: "cena fala tokens reserva")
+// SAVE / LOAD (arquivo de texto: "cena fala tokens reserva iaEscreveu")
 // =====================================================
 
+// O build de desenvolvimento usa outro arquivo: os testes nunca mexem no
+// progresso salvo da jogadora.
+#ifdef RE7_DEV_MODE
+#define SAVE_FILE "save_dev.dat"
+#else
 #define SAVE_FILE "save.dat"
+#endif
 
 static bool SaveGame(GameState *game)
 {
     return SaveFileText(
         SAVE_FILE,
         (char *)TextFormat(
-            "%d %d %d %d",
+            "%d %d %d %d %d",
             (int)game->currentScene,
             game->dialogueIndex,
             Tokens_Valor(),
-            Tokens_ReservaUsada() ? 1 : 0
+            Tokens_ReservaUsada() ? 1 : 0,
+            game->iaEscreveuDiscurso ? 1 : 0
         )
     );
 }
@@ -91,12 +101,13 @@ static bool LoadGame(GameState *game)
     int tokens = TOKENS_MAX;
 
     int reserva = 0;
-    int lidos = sscanf(text, "%d %d %d %d", &scene, &index, &tokens, &reserva);
+    int iaEscreveu = 0;
+    int lidos = sscanf(text, "%d %d %d %d %d", &scene, &index, &tokens, &reserva, &iaEscreveu);
 
     UnloadFileText(text);
 
-    // O save anterior tem tres campos e ainda pode ser carregado.
-    if (lidos != 3 && lidos != 4) return false;
+    // Saves antigos tem tres ou quatro campos e ainda podem ser carregados.
+    if (lidos < 3 || lidos > 5) return false;
 
     if (scene < 0 || scene >= SCENE_COUNT) return false;
 
@@ -109,6 +120,8 @@ static bool LoadGame(GameState *game)
     game->currentScene = (SceneID)scene;
     game->dialogueIndex = index;
     game->choice = 0;
+    game->iaEscreveuDiscurso = (iaEscreveu == 1);
+    game->campanha = CAMPANHA_EM_ANDAMENTO;
 
     Tokens_Restaurar(tokens, reserva == 1);
     BarraTokens_Reiniciar();
@@ -558,6 +571,10 @@ static void AtualizarMusica(GameState *game)
             // A musica da corrida e controlada em ato2_corrida.c.
             break;
 
+        case SCREEN_ENTRE_LINHAS:
+            AudioManager_PlayMusic(MUSICA_2007);
+            break;
+
         case SCREEN_GAME:
         {
             Scene scene = GetScene(game->currentScene);
@@ -578,6 +595,12 @@ static void AtualizarMusica(GameState *game)
                 case SCENE_ATO2_CG_CASA_NOITE:
                 case SCENE_ATO2_CG_FRENTE_ESCOLA:
                 case SCENE_ATO2_CG_ENSAIO:
+                    AudioManager_PlayMusic(MUSICA_VITORIA);
+                    break;
+
+                case SCENE_ATO3_CONCLUSAO:
+                case SCENE_ATO3_CONCLUSAO_IA_ESCREVEU:
+                case SCENE_ATO3_ETAPA_CONCLUIDA:
                     AudioManager_PlayMusic(MUSICA_VITORIA);
                     break;
 
@@ -764,7 +787,8 @@ typedef enum
     ESCOLHA_NENHUMA = 0,
     ESCOLHA_ANO,        // Ato 1: em que ano voce esta?
     ESCOLHA_AMIGO,      // Ato 2: dar uma chance ao amigo
-    ESCOLHA_IA          // Ato 2: o que responder a IA na lan house
+    ESCOLHA_IA,         // Ato 2: o que responder a IA na lan house
+    ESCOLHA_PAPEL       // Ato 3: ajuda da IA com o papel do discurso
 } EscolhaId;
 
 typedef struct
@@ -792,8 +816,21 @@ static const Escolha ESCOLHAS[] =
     {
         ATO2_ESCOLHA2_PERGUNTA, 3,
         { ATO2_ESCOLHA2_A, ATO2_ESCOLHA2_B, ATO2_ESCOLHA2_C }
+    },
+
+    // a ordem segue Ato3Ajuda (ato3_logica.h)
+    [ESCOLHA_PAPEL] =
+    {
+        ATO3_ESCOLHA_PERGUNTA, 3,
+        { ATO3_ESCOLHA_A, ATO3_ESCOLHA_B, ATO3_ESCOLHA_C }
     }
 };
+
+// Escolhas que aparecem como janela do MSN
+static bool EscolhaNoMSN(int escolha)
+{
+    return escolha == ESCOLHA_IA || escolha == ESCOLHA_PAPEL;
+}
 
 // Opcao errada: pisca em vermelho por um instante e a escolha continua
 static float escolhaErro = 0.0f;
@@ -802,7 +839,7 @@ static int escolhaErroOpcao = -1;
 // Area clicavel de cada opcao
 static Rectangle AreaOpcao(int escolha, int indice)
 {
-    float topo = (escolha == ESCOLHA_IA) ? 250.0f : 230.0f;
+    float topo = EscolhaNoMSN(escolha) ? 250.0f : 230.0f;
 
     return (Rectangle){ 340.0f, topo + indice * 84.0f, 600.0f, 66.0f };
 }
@@ -827,7 +864,7 @@ static void DesenharEscolha(GameState *game)
     // escurece o fundo
     DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.45f));
 
-    if (game->choice == ESCOLHA_IA)
+    if (EscolhaNoMSN(game->choice))
     {
         DesenharPopupMSN();
         UiDrawText(e->pergunta, 340, 175, 28, (Color){ 29, 38, 96, 255 });
@@ -902,6 +939,7 @@ static void ResolverEscolha(GameState *game, int opcao)
             if (opcao == 0)                         // IA escreve o discurso: zera
             {
                 Tokens_Zerar();
+                game->iaEscreveuDiscurso = true;    // muda falas do Ato 3
                 ChangeScene(game, SCENE_ATO2_IA_ESCREVE);
             }
             else if (opcao == 1)                    // so uma ideia: -1
@@ -915,6 +953,16 @@ static void ResolverEscolha(GameState *game, int opcao)
                 ChangeScene(game, SCENE_ATO2_COM_JOAO);
             }
             break;
+
+        case ESCOLHA_PAPEL:
+        {
+            game->choice = ESCOLHA_NENHUMA;
+
+            Ato3Ajuda ajuda = (Ato3Ajuda)opcao;     // 0 IA le, 1 tirar opcao, 2 sozinha
+            Ato3_AplicarAjuda(ajuda);
+            ChangeScene(game, Ato3_CenaDaAjuda(ajuda, game->iaEscreveuDiscurso));
+            break;
+        }
 
         default:
             break;
@@ -938,6 +986,27 @@ static void AtualizarEscolha(GameState *game)
             return;
         }
     }
+}
+
+
+// =====================================================
+// FIM DA CAMPANHA (epilogo ou final ruim)
+// =====================================================
+
+static void EncerrarCampanha(GameState *game, EstadoCampanha final, MotivoFinalRuim motivo)
+{
+    game->campanha = final;
+    game->motivoFinalRuim = motivo;
+    game->choice = ESCOLHA_NENHUMA;
+
+    fadeFase = FADE_NENHUM;
+    pcAtivo = false;
+
+    // fim da historia: o save volta ao inicio (para jogar de novo)
+    // e a tela final aparece
+    ChangeScene(game, SCENE_PRESENT);
+    SaveGame(game);
+    game->currentScreen = SCREEN_ENDING;
 }
 
 
@@ -1031,12 +1100,54 @@ static void FimDaCena(GameState *game, Scene scene)
             );
             return;
 
-        case SCENE_EPILOGUE:
-            // fim da historia: volta ao inicio (para jogar de novo)
-            // e mostra a tela final
-            ChangeScene(game, SCENE_PRESENT);
+        // ---------------- Ato 3 ----------------
+
+        case SCENE_ATO2_CG_PROFESSORA:
+        case SCENE_ATO2_CG_PROFESSORA_SEM_IA:
+            // fim do Ato 2: escurece e abre o auditorio
+            game->dialogueIndex = scene.dialogueCount - 1;
+            IniciarFade(FADE_ESCURECENDO, FADE_TRANSICAO, scene.nextScene);
+            return;
+
+        case SCENE_ATO3_ABERTURA:
+            // barra em 0: a IA volta com o token de reserva (uma unica vez)
+            ChangeScene(game, Ato3_CenaAposAbertura());
+            return;
+
+        case SCENE_ATO3_OFERTA:
+            // escolha do papel (pop-up do MSN)
+            game->dialogueIndex = scene.dialogueCount - 1;
+            game->choice = ESCOLHA_PAPEL;
+            escolhaErro = 0.0f;
+            return;
+
+        case SCENE_ATO3_AJUDA:
+        case SCENE_ATO3_SOZINHA:
+            // Desafio 3: "Entre as Linhas"
+            game->dialogueIndex = scene.dialogueCount - 1;
             SaveGame(game);
-            game->currentScreen = SCREEN_ENDING;
+            InitAto3EntreLinhas(game->currentScene == SCENE_ATO3_SOZINHA
+                                    ? ATO3_AJUDA_SOZINHA : ATO3_AJUDA_TIRAR_OPCAO);
+            game->currentScreen = SCREEN_ENTRE_LINHAS;
+            return;
+
+        case SCENE_ATO3_IA_LE:
+        case SCENE_ATO3_IA_LE_IA_ESCREVEU:
+            // cenario 1: final ruim, qualquer que fosse a barra
+            EncerrarCampanha(game, CAMPANHA_FINAL_RUIM, FINAL_RUIM_IA_LEU);
+            return;
+
+        case SCENE_ATO3_CONCLUSAO:
+        case SCENE_ATO3_CONCLUSAO_IA_ESCREVEU:
+            // com pelo menos 1 token: "Etapa concluida" e epilogo; com 0: final ruim
+            if (Ato3_TerminaNoEpilogo())
+                ChangeScene(game, SCENE_ATO3_ETAPA_CONCLUIDA);
+            else
+                EncerrarCampanha(game, CAMPANHA_FINAL_RUIM, FINAL_RUIM_SEM_TOKENS);
+            return;
+
+        case SCENE_EPILOGUE:
+            EncerrarCampanha(game, CAMPANHA_FINAL_BOM, FINAL_RUIM_IA_LEU);
             return;
 
         default:
@@ -1084,6 +1195,10 @@ void InitGame(GameState *game)
 
     game->senhaNoQuarto = false;
 
+    game->iaEscreveuDiscurso = false;
+    game->campanha = CAMPANHA_EM_ANDAMENTO;
+    game->motivoFinalRuim = FINAL_RUIM_IA_LEU;
+
     fadeFase = FADE_NENHUM;
     pcAtivo = false;
 
@@ -1097,6 +1212,10 @@ void InitGame(GameState *game)
 // TROCAR DE CENA
 // =====================================================
 
+#ifdef RE7_DEV_MODE
+static void DevRegistrarEntradaNoAto(const GameState *game);
+#endif
+
 void ChangeScene(
     GameState *game,
     SceneID nextScene
@@ -1105,6 +1224,12 @@ void ChangeScene(
     game->currentScene = nextScene;
 
     game->dialogueIndex = 0;
+
+#ifdef RE7_DEV_MODE
+    // modo desenvolvedor: guarda tokens e variaveis da entrada em cada ato
+    // (para "Reiniciar ato")
+    DevRegistrarEntradaNoAto(game);
+#endif
 }
 
 
@@ -1125,12 +1250,75 @@ static void ComecarNovoJogo(GameState *game)
 
     game->choice = 0;
     game->senhaNoQuarto = false;
+    game->iaEscreveuDiscurso = false;
+    game->campanha = CAMPANHA_EM_ANDAMENTO;
 
     Tokens_Reiniciar();                             // barra volta a 3
     BarraTokens_Reiniciar();
     Senha_ComecarJogo();
 
+#ifdef RE7_DEV_MODE
+    DevRegistrarEntradaNoAto(game);                 // a barra ja voltou a 3
+#endif
+
     SaveGame(game);                                 // zera o save
+}
+
+
+// =====================================================
+// FIM DE CADA MINIJOGO E AVANCO DAS FALAS
+// (usados pelo jogo e pelo modo desenvolvedor, para nao repetir a logica)
+// =====================================================
+
+static void ConcluirSenha(GameState *game)
+{
+    game->currentScreen = SCREEN_GAME;
+    ChangeScene(game, SCENE_ATO1_IA_A);
+    SaveGame(game);
+}
+
+static void ConcluirCorrida(GameState *game)
+{
+    // chegou ao fim do corredor
+    game->currentScreen = SCREEN_GAME;
+    ChangeScene(game, SCENE_ATO2_ENCONTRO);
+    encontroTempo = 0.0f;
+    IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_ENCONTRO, SCENE_ATO2_ENCONTRO);
+    SaveGame(game);
+}
+
+static void ConcluirQuarto(GameState *game)
+{
+    // Fim da exploracao: o PC esta bloqueado
+    game->currentScreen = SCREEN_GAME;
+    ChangeScene(game, SCENE_2007_PC);
+    SaveGame(game);
+}
+
+static void ConcluirEntreLinhas(GameState *game)
+{
+    // as tres palavras recuperadas: a plateia aplaude e a Lia fala
+    game->currentScreen = SCREEN_GAME;
+    ChangeScene(game, Ato3_CenaDeConclusao(game->iaEscreveuDiscurso));
+    SaveGame(game);
+}
+
+// Proxima fala (clique ou ESPACO). No fim da cena, FimDaCena decide o que vem.
+static void AvancarFala(GameState *game)
+{
+    Scene scene = GetScene(game->currentScene);
+
+    game->dialogueIndex++;
+
+    if (game->dialogueIndex >= scene.dialogueCount)
+    {
+        FimDaCena(game, scene);
+
+        if (game->currentScreen != SCREEN_GAME || game->choice != ESCOLHA_NENHUMA)
+            return;
+    }
+
+    SaveGame(game);                                 // salva a cada fala
 }
 
 
@@ -1166,7 +1354,8 @@ static const char *mensagemPausa = NULL;
 static bool PodePausar(GameScreen tela)
 {
     return tela == SCREEN_GAME || tela == SCREEN_ROOM ||
-           tela == SCREEN_SENHA || tela == SCREEN_CORRIDA;
+           tela == SCREEN_SENHA || tela == SCREEN_CORRIDA ||
+           tela == SCREEN_ENTRE_LINHAS;
 }
 
 static Rectangle AreaBotaoMenu(GameScreen tela)
@@ -1447,11 +1636,7 @@ void UpdateGame(GameState *game)
         Senha_Atualizar();
 
         if (Senha_Concluida())
-        {
-            game->currentScreen = SCREEN_GAME;
-            ChangeScene(game, SCENE_ATO1_IA_A);
-            SaveGame(game);
-        }
+            ConcluirSenha(game);
 
         return;
     }
@@ -1466,13 +1651,28 @@ void UpdateGame(GameState *game)
         MinigameResult resultado = UpdateAto2Corrida();
 
         if (resultado == MINIGAME_VENCEU)      // chegou ao fim do corredor
+            ConcluirCorrida(game);
+
+        return;
+    }
+
+
+    // -------------------------------------------------
+    // DESAFIO 3: ENTRE AS LINHAS (Ato 3)
+    // -------------------------------------------------
+
+    if (game->currentScreen == SCREEN_ENTRE_LINHAS)
+    {
+        // ESC: abre o menu de pausa
+        if (IsKeyPressed(KEY_ESCAPE))
         {
-            game->currentScreen = SCREEN_GAME;
-            ChangeScene(game, SCENE_ATO2_ENCONTRO);
-            encontroTempo = 0.0f;
-            IniciarFade(FADE_CLAREANDO, FADE_ENTRADA_ENCONTRO, SCENE_ATO2_ENCONTRO);
-            SaveGame(game);
+            AudioManager_Play(SOM_MOUSE);
+            AbrirPausa(game);
+            return;
         }
+
+        if (UpdateAto3EntreLinhas() == MINIGAME_VENCEU)
+            ConcluirEntreLinhas(game);
 
         return;
     }
@@ -1487,12 +1687,7 @@ void UpdateGame(GameState *game)
         RoomResult resultadoQuarto = UpdateRoom();
 
         if (resultadoQuarto == ROOM_CONCLUIDO)
-        {
-            // Fim da exploracao: o PC esta bloqueado
-            game->currentScreen = SCREEN_GAME;
-            ChangeScene(game, SCENE_2007_PC);
-            SaveGame(game);
-        }
+            ConcluirQuarto(game);
 
         return;
     }
@@ -1586,22 +1781,10 @@ void UpdateGame(GameState *game)
             return;
         }
 
-        Scene scene = GetScene(game->currentScene);
-
-       if (IsKeyPressed(KEY_SPACE) ||
-    IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+        if (IsKeyPressed(KEY_SPACE) ||
+            IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         {
-            game->dialogueIndex++;
-
-            if (game->dialogueIndex >= scene.dialogueCount)
-            {
-                FimDaCena(game, scene);
-
-                if (game->currentScreen != SCREEN_GAME || game->choice != ESCOLHA_NENHUMA)
-                    return;
-            }
-
-            SaveGame(game);                         // salva a cada fala
+            AvancarFala(game);
         }
     }
 }
@@ -1700,6 +1883,144 @@ static void DesenharConfirmacaoMenu(void)
     if (mensagemPausa)
         DrawCenteredText(mensagemPausa, 454, 18, PINK);
 }
+
+// =====================================================
+// ATO 3: AUDITORIO
+// =====================================================
+
+static bool CenaDoAto3(SceneID cena)
+{
+    // as cenas do Ato 3 ficam no fim da lista (depois do epilogo)
+    return cena >= SCENE_ATO3_ABERTURA && cena < SCENE_COUNT;
+}
+
+static void DesenharCenaAto3(GameState *game, const Scene *scene, Dialogue dialogue)
+{
+    // tempo desde que a cena comecou (o PC pisca no comeco da reserva,
+    // a camera se aproxima da Lia na conclusao)
+    static SceneID cenaAnterior = (SceneID)-1;
+    static float tempoNaCena = 0.0f;
+
+    if (game->currentScene != cenaAnterior)
+    {
+        cenaAnterior = game->currentScene;
+        tempoNaCena = 0.0f;
+    }
+
+    if (fadeFase != FADE_SEGURANDO) tempoNaCena += GetFrameTime();
+
+    SceneID c = game->currentScene;
+    bool conclusao = (c == SCENE_ATO3_CONCLUSAO || c == SCENE_ATO3_CONCLUSAO_IA_ESCREVEU ||
+                      c == SCENE_ATO3_ETAPA_CONCLUIDA);
+    bool iaLeu = (c == SCENE_ATO3_IA_LE || c == SCENE_ATO3_IA_LE_IA_ESCREVEU);
+    bool antesDaEscolha = (c == SCENE_ATO3_ABERTURA || c == SCENE_ATO3_RESERVA || c == SCENE_ATO3_OFERTA);
+
+    float foco = tempoNaCena / 1.2f;
+    if (foco > 1.0f) foco = 1.0f;
+
+    Ato3Cena cena = {
+        .pcOnline = !Tokens_IAOffline(),
+        .pcPiscando = (c == SCENE_ATO3_RESERVA && tempoNaCena < 1.2f),
+        // cenario 1: a plateia aplaude no fim, mas a Lia nao sorri
+        .aplausos = conclusao || (iaLeu && game->dialogueIndex >= scene->dialogueCount - 1),
+        .professoraSorri = conclusao,
+        .foco = conclusao ? foco * (2.0f - foco) : 0.0f,
+        .nervosismo = antesDaEscolha ? 1.0f : ((c == SCENE_ATO3_AJUDA || c == SCENE_ATO3_SOZINHA) ? 0.6f : 0.0f)
+    };
+
+    Ato3_DesenharCenario(&cena);
+
+    // Papel: aparece depois da fala da Lia; na conclusao a camera fica na Lia.
+    bool mostrarPapel = !conclusao && !(c == SCENE_ATO3_ABERTURA && game->dialogueIndex < 1);
+
+    if (mostrarPapel)
+    {
+        // cenario 1: o papel fica nitido quando a IA le as palavras
+        float n = (iaLeu && game->dialogueIndex >= 1) ? 1.0f : 0.0f;
+        float nitidez[3] = { n, n, n };
+
+        // a esquerda do palco: a Lia e o PC do pulpito continuam visiveis
+        Rectangle papel = {190, 165, 400, 232};
+        Ato3_DesenharPapel(papel, 19, nitidez, -1, (Vector2){0, 0});
+
+        if (n < 1.0f)
+            UiDrawText("As palavras parecem embaralhadas...", (int)papel.x + 27,
+                       (int)(papel.y + papel.height) - 30, 17, (Color){120, 88, 77, 255});
+    }
+
+    DrawDialogueBox(dialogue.speaker, dialogue.text);
+    BarraTokens_Desenhar(990, 20);
+
+    if (game->choice == ESCOLHA_NENHUMA)
+        UiDrawText("CLIQUE ou ESPAÇO para continuar", 760, 690, 18, Fade(WHITE, 0.8f));
+    else
+        DesenharEscolha(game);
+
+    DesenharFlash();
+    DesenharFade();
+    DesenharAvisoSom();
+}
+
+
+// =====================================================
+// TELA FINAL (final bom ou ruim)
+// =====================================================
+
+static void DesenharOpcoesDaTelaFinal(int y)
+{
+    DrawCenteredText("ENTER - jogar novamente", y, 28, WHITE);
+    DrawCenteredText("M - voltar ao menu", y + 45, 28, WHITE);
+    DrawCenteredText("ESC - sair do jogo", y + 90, 28, WHITE);
+
+    if (avisoInvalido > 0.0f)
+    {
+        DrawCenteredText(
+            "Opcao invalida! Use ENTER, M ou ESC.",
+            y + 160, 24,
+            Fade((Color){255, 105, 200, 255}, fminf(1.0f, avisoInvalido))
+        );
+    }
+}
+
+// Final ruim (roteiro do Ato 3): MSN offline e o cartao
+static void DesenharFinalRuim(const GameState *game)
+{
+    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){10, 10, 18, 255});
+
+    // janela do MSN, offline
+    Rectangle janela = {340, 70, 600, 180};
+    DrawRectangleRounded(janela, 0.06f, 8, (Color){210, 214, 222, 255});
+    DrawRectangleRounded((Rectangle){janela.x, janela.y, janela.width, 40}, 0.4f, 8, (Color){120, 128, 140, 255});
+    DrawCircle((int)janela.x + 24, (int)janela.y + 20, 8, (Color){200, 60, 90, 255});
+    UiDrawText("IA - Offline", (int)janela.x + 42, (int)janela.y + 9, 22, WHITE);
+
+    UiDrawTextEmphasis("MSN OFFLINE", (int)janela.x + 30, (int)janela.y + 64, 30, (Color){29, 38, 96, 255});
+    UiDrawText(ATO3_MSN_OFFLINE, (int)janela.x + 30, (int)janela.y + 112, 22, (Color){70, 70, 90, 255});
+
+    // cartao
+    const char *cartao = (game->motivoFinalRuim == FINAL_RUIM_SEM_TOKENS)
+        ? ATO3_CARTAO_SEM_TOKEN : ATO3_CARTAO_IA_LEU;
+
+    int fs = 34;
+    int larg = UiMeasureTextEmphasis(cartao, fs);
+    UiDrawTextEmphasis(cartao, (GetScreenWidth() - larg) / 2, 300, fs, WHITE);
+
+    DrawCenteredText("FIM (FINAL RUIM)", 365, 26, (Color){255, 105, 200, 255});
+
+    DesenharOpcoesDaTelaFinal(450);
+}
+
+static void DesenharFinalBom(void)
+{
+    DesenharFundo();
+
+    DrawCenteredText("FIM", 150, 90, WHITE);
+    DrawCenteredText("Lia aprendeu a confiar na propria voz.", 280, 30, SKYBLUE);
+    DrawCenteredText("Obrigada por jogar Re:7!", 330, 28, WHITE);
+
+    DesenharOpcoesDaTelaFinal(440);
+}
+
 
 // =====================================================
 // DESENHAR JOGO
@@ -1848,25 +2169,24 @@ void DrawGame(
 
     if (game->currentScreen == SCREEN_ENDING)
     {
-        DesenharFundo();
+        if (game->campanha == CAMPANHA_FINAL_RUIM)
+            DesenharFinalRuim(game);
+        else
+            DesenharFinalBom();
 
-        DrawCenteredText("FIM", 150, 90, WHITE);
-        DrawCenteredText("Lia aprendeu a confiar na propria voz.", 280, 30, SKYBLUE);
-        DrawCenteredText("Obrigada por jogar Re:7!", 330, 28, WHITE);
+        return;
+    }
 
-        DrawCenteredText("ENTER - jogar novamente", 440, 28, WHITE);
-        DrawCenteredText("M - voltar ao menu", 485, 28, WHITE);
-        DrawCenteredText("ESC - sair do jogo", 530, 28, WHITE);
 
-        if (avisoInvalido > 0.0f)
-        {
-            DrawCenteredText(
-                "Opcao invalida! Use ENTER, M ou ESC.",
-                600, 24,
-                Fade((Color){255, 105, 200, 255}, fminf(1.0f, avisoInvalido))
-            );
-        }
+    // -------------------------------------------------
+    // DESAFIO 3: ENTRE AS LINHAS (Ato 3)
+    // -------------------------------------------------
 
+    if (game->currentScreen == SCREEN_ENTRE_LINHAS)
+    {
+        DrawAto3EntreLinhas(assets);
+        BarraTokens_Desenhar(990, 20);
+        DesenharAvisoSom();
         return;
     }
 
@@ -1918,32 +2238,9 @@ void DrawGame(
 
         Dialogue dialogue = scene.dialogues[game->dialogueIndex];
 
-        if (game->currentScene == SCENE_ATO3_ABERTURA ||
-            game->currentScene == SCENE_ATO3_RESERVA ||
-            game->currentScene == SCENE_ATO3_OFERTA)
+        if (CenaDoAto3(game->currentScene))
         {
-            Ato3_DesenharCenario();
-
-            Color telaPC = Tokens_IAOffline()
-                ? (Color){25, 28, 35, 255}
-                : (Color){74, 190, 135, 255};
-            DrawRectangle(684, 293, 42, 28, telaPC);
-
-            if (game->currentScene != SCENE_ATO3_ABERTURA ||
-                game->dialogueIndex >= 1)
-            {
-                Ato3_DesenharPapel();
-            }
-
-            DrawDialogueBox(dialogue.speaker, dialogue.text);
-            BarraTokens_Desenhar(990, 20);
-
-            UiDrawText(
-                "CLIQUE ou ESPACO para continuar",
-                760, 690, 18, Fade(WHITE, 0.8f)
-            );
-
-            DesenharAvisoSom();
+            DesenharCenaAto3(game, &scene, dialogue);
             return;
         }
 
@@ -2085,3 +2382,269 @@ void DrawGame(
 
     // DrawMousePosition();
 }
+
+
+// =====================================================
+// MODO DESENVOLVEDOR (so no build com -DRE7_DEV_MODE)
+// Atalhos para os testes. Tudo passa pelas mesmas funcoes do jogo
+// (ChangeScene, AvancarFala, Concluir..., EncerrarCampanha, ComecarNovoJogo).
+// =====================================================
+
+#ifdef RE7_DEV_MODE
+
+// Tokens e variaveis no momento em que cada ato comecou ("Reiniciar ato")
+typedef struct
+{
+    bool valido;
+    int tokens;
+    bool reservaUsada;
+    bool iaEscreveu;
+} EntradaAto;
+
+static EntradaAto entradaAto[ATO_EPILOGO + 1];
+
+static AtoId AtoDaCena(SceneID cena)
+{
+    if (cena >= SCENE_ATO3_ABERTURA) return ATO_3;
+    if (cena == SCENE_EPILOGUE)      return ATO_EPILOGO;
+    if (cena >= SCENE_ATO2_QUARTO)   return ATO_2;
+    return ATO_1;
+}
+
+static SceneID InicioDoAto(AtoId ato)
+{
+    switch (ato)
+    {
+        case ATO_2:       return SCENE_ATO2_QUARTO;
+        case ATO_3:       return SCENE_ATO3_ABERTURA;
+        case ATO_EPILOGO: return SCENE_EPILOGUE;
+        default:          return SCENE_PRESENT;
+    }
+}
+
+static void DevRegistrarEntradaNoAto(const GameState *game)
+{
+    for (int a = ATO_1; a <= ATO_EPILOGO; a++)
+    {
+        if (game->currentScene != InicioDoAto((AtoId)a)) continue;
+
+        entradaAto[a].valido = true;
+        entradaAto[a].tokens = Tokens_Valor();
+        entradaAto[a].reservaUsada = Tokens_ReservaUsada();
+        entradaAto[a].iaEscreveu = game->iaEscreveuDiscurso;
+    }
+}
+
+AtoId Game_AtoAtual(const GameState *game)
+{
+    GameScreen tela = game->currentScreen;
+
+    if (tela == SCREEN_PAUSE || tela == SCREEN_CONFIRM_MENU || tela == SCREEN_AUDIO)
+        tela = game->pauseReturnScreen;
+
+    switch (tela)
+    {
+        case SCREEN_ROOM:
+        case SCREEN_SENHA:        return ATO_1;
+        case SCREEN_CORRIDA:      return ATO_2;
+        case SCREEN_ENTRE_LINHAS: return ATO_3;
+        default:                  return AtoDaCena(game->currentScene);
+    }
+}
+
+// Cancela fade, sequencia do PC, flash e escolha abertos
+static void DevLimparTransicoes(GameState *game)
+{
+    fadeFase = FADE_NENHUM;
+    pcAtivo = false;
+    flashTimer = 0.0f;
+    escolhaErro = 0.0f;
+    avisoInvalido = 0.0f;
+    encontroTempo = 0.0f;
+    game->choice = ESCOLHA_NENHUMA;
+}
+
+void Game_IrParaAto(GameState *game, AtoId ato)
+{
+    DevLimparTransicoes(game);
+
+    game->campanha = CAMPANHA_EM_ANDAMENTO;
+
+    if (ato == ATO_1)
+    {
+        game->senhaNoQuarto = false;
+        Senha_ComecarJogo();
+    }
+
+    game->currentScreen = SCREEN_GAME;
+    ChangeScene(game, InicioDoAto(ato));        // guarda a entrada no ato
+
+    if (ato == ATO_EPILOGO) flashTimer = FLASH_DURACAO;     // volta ao presente
+
+    SaveGame(game);                             // save_dev.dat
+}
+
+void Game_ReiniciarAto(GameState *game)
+{
+    AtoId ato = Game_AtoAtual(game);
+
+    if (entradaAto[ato].valido)
+    {
+        Tokens_Restaurar(entradaAto[ato].tokens, entradaAto[ato].reservaUsada);
+        game->iaEscreveuDiscurso = entradaAto[ato].iaEscreveu;
+    }
+
+    Game_IrParaAto(game, ato);
+}
+
+void Game_ReiniciarCampanha(GameState *game)
+{
+    DevLimparTransicoes(game);
+    ComecarNovoJogo(game);
+}
+
+// Termina na hora o fade ou a sequencia do PC. True se havia algum.
+static bool DevPularTransicao(void)
+{
+    if (pcAtivo)
+    {
+        pcTempo = PC_ESPERA;
+        if (pcSaida < PC_SAIDA) pcSaida = PC_SAIDA;
+        return true;
+    }
+
+    if (fadeFase != FADE_NENHUM)
+    {
+        fadeTempo = fadeDuracao;
+        return true;
+    }
+
+    return false;
+}
+
+bool Game_PularFala(GameState *game)
+{
+    switch (game->currentScreen)
+    {
+        case SCREEN_GAME:
+            if (DevPularTransicao()) return true;
+            if (game->choice != ESCOLHA_NENHUMA) return false;
+            AvancarFala(game);
+            return true;
+
+        case SCREEN_ENTRE_LINHAS:
+            return Ato3EntreLinhas_DevPular();
+
+        case SCREEN_ROOM:
+        case SCREEN_SENHA:
+        case SCREEN_CORRIDA:
+            return Game_AvancarEtapa(game);     // minijogos sem falas: conclui
+
+        default:
+            return false;
+    }
+}
+
+bool Game_AvancarEtapa(GameState *game)
+{
+    switch (game->currentScreen)
+    {
+        case SCREEN_GAME:
+        {
+            if (DevPularTransicao()) return true;
+            if (game->choice != ESCOLHA_NENHUMA) return false;
+
+            Scene scene = GetScene(game->currentScene);
+            game->dialogueIndex = scene.dialogueCount - 1;
+            AvancarFala(game);                  // FimDaCena decide o que vem
+            return true;
+        }
+
+        case SCREEN_ROOM:         ConcluirQuarto(game);   return true;
+        case SCREEN_SENHA:        ConcluirSenha(game);    return true;
+        case SCREEN_CORRIDA:      ConcluirCorrida(game);  return true;
+
+        case SCREEN_ENTRE_LINHAS:
+            Ato3EntreLinhas_DevResolverEtapa();     // a palavra certa
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+void Game_ForcarFinal(GameState *game, EstadoCampanha final)
+{
+    DevLimparTransicoes(game);
+
+    if (final == CAMPANHA_FINAL_BOM)
+        EncerrarCampanha(game, CAMPANHA_FINAL_BOM, FINAL_RUIM_IA_LEU);
+    else if (final == CAMPANHA_FINAL_RUIM)
+        EncerrarCampanha(game, CAMPANHA_FINAL_RUIM, FINAL_RUIM_IA_LEU);
+    else
+        game->campanha = CAMPANHA_EM_ANDAMENTO;
+}
+
+const char *Game_NomeDaCena(SceneID cena)
+{
+    switch (cena)
+    {
+        case SCENE_PRESENT:                     return "Ato 1: presente (2026)";
+        case SCENE_2007:                        return "Ato 1: quarto 2007";
+        case SCENE_2007_PC:                     return "Ato 1: PC bloqueado";
+        case SCENE_ATO1_IA_A:                   return "Ato 1: IA explica";
+        case SCENE_ATO1_IA_B:                   return "Ato 1: ano certo";
+        case SCENE_ATO2_QUARTO:                 return "Ato 2: quarto";
+        case SCENE_ATO2_CORREDOR:               return "Ato 2: corredor";
+        case SCENE_ATO2_DETERMINADA:            return "Ato 2: determinada";
+        case SCENE_ATO2_LANHOUSE:               return "Ato 2: lan house";
+        case SCENE_ATO2_IA_ESCREVE:             return "Ato 2: IA escreve";
+        case SCENE_ATO2_UMA_IDEIA:              return "Ato 2: uma ideia";
+        case SCENE_ATO2_COM_JOAO:               return "Ato 2: com o João";
+        case SCENE_ATO2_C4:                     return "Ato 2: cena 4";
+        case SCENE_ATO2_CG_ESCREVEM:            return "Ato 2: CG escrevem";
+        case SCENE_ATO2_CG_PROFESSORA:          return "Ato 2: CG professora";
+        case SCENE_ATO2_C4_ZERO:                return "Ato 2: cena 4 (barra 0)";
+        case SCENE_ATO2_CG_ENSAIO:              return "Ato 2: CG ensaio";
+        case SCENE_ATO2_ENCONTRO:               return "Ato 2: encontro";
+        case SCENE_ATO2_RES21:                  return "Ato 2: resultado 2.1";
+        case SCENE_ATO2_RES22:                  return "Ato 2: resultado 2.2";
+        case SCENE_ATO2_LANHOUSE_SEM:           return "Ato 2: lan house sem João";
+        case SCENE_ATO2_CG_PROFESSORA_SEM_IA:   return "Ato 2: CG professora sem IA";
+        case SCENE_ATO2_CG_CASA_NOITE:          return "Ato 2: CG casa à noite";
+        case SCENE_ATO2_CG_FRENTE_ESCOLA:       return "Ato 2: CG frente da escola";
+        case SCENE_EPILOGUE:                    return "Epílogo";
+        case SCENE_ATO3_ABERTURA:               return "Ato 3: abertura";
+        case SCENE_ATO3_RESERVA:                return "Ato 3: token de reserva";
+        case SCENE_ATO3_OFERTA:                 return "Ato 3: oferta da IA";
+        case SCENE_ATO3_IA_LE:                  return "Ato 3: IA lê o papel";
+        case SCENE_ATO3_IA_LE_IA_ESCREVEU:      return "Ato 3: IA lê (IA escreveu)";
+        case SCENE_ATO3_AJUDA:                  return "Ato 3: tirar uma opção";
+        case SCENE_ATO3_SOZINHA:                return "Ato 3: tentar sozinha";
+        case SCENE_ATO3_CONCLUSAO:              return "Ato 3: conclusão";
+        case SCENE_ATO3_CONCLUSAO_IA_ESCREVEU:  return "Ato 3: conclusão (IA escreveu)";
+        case SCENE_ATO3_ETAPA_CONCLUIDA:        return "Ato 3: etapa concluída";
+        default:                                return "cena desconhecida";
+    }
+}
+
+const char *Game_NomeDaTela(GameScreen tela)
+{
+    switch (tela)
+    {
+        case SCREEN_MENU:          return "Menu";
+        case SCREEN_GAME:          return "História";
+        case SCREEN_CREDITS:       return "Créditos";
+        case SCREEN_ENDING:        return "Tela final";
+        case SCREEN_ROOM:          return "Quarto (Ato 1)";
+        case SCREEN_AUDIO:         return "Áudio";
+        case SCREEN_SENHA:         return "Senha (Ato 1)";
+        case SCREEN_CORRIDA:       return "Corrida (Ato 2)";
+        case SCREEN_PAUSE:         return "Pausa";
+        case SCREEN_CONFIRM_MENU:  return "Confirmar menu";
+        case SCREEN_ENTRE_LINHAS:  return "Entre as Linhas (Ato 3)";
+        default:                   return "outra";
+    }
+}
+
+#endif
