@@ -1,3 +1,4 @@
+#include "tela.h"
 #include "game.h"
 
 #include "ui.h"
@@ -31,8 +32,8 @@ static void BrilhoSuave(float centroX, float centroY, float raio, Color cor, flo
 
 static void DesenharFundo(void)
 {
-    int larguraTela = GetScreenWidth();
-    int alturaTela = GetScreenHeight();
+    int larguraTela = TELA_LARGURA;
+    int alturaTela = TELA_ALTURA;
     float tempo = (float)GetTime();
 
     // base: violeta-noite para azul-marinho
@@ -190,7 +191,7 @@ static void DesenharFade(void)
     if (fadeFase == FADE_ESCURECENDO) alfa = t;
     else if (fadeFase == FADE_CLAREANDO) alfa = 1.0f - t;
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alfa));
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, alfa));
 
     // o texto entra e sai com o mesmo fade da tela
     const char *texto = TextoDeTransicao(fadeDestino);
@@ -198,7 +199,7 @@ static void DesenharFade(void)
     {
         int tamanho = 44;
         int largura = MeasureText(texto, tamanho);
-        DrawText(texto, (GetScreenWidth() - largura) / 2, GetScreenHeight() / 2 - tamanho / 2,
+        DrawText(texto, (TELA_LARGURA - largura) / 2, TELA_ALTURA / 2 - tamanho / 2,
                  tamanho, Fade(WHITE, alfa));
     }
 }
@@ -245,8 +246,8 @@ static const PcPonto pcCaminho[] =
 static Vector2 PcPosicaoMouse(float t)
 {
     int n = (int)(sizeof(pcCaminho) / sizeof(pcCaminho[0]));
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
 
     if (t <= pcCaminho[0].t) return (Vector2){ pcCaminho[0].x * larg, pcCaminho[0].y * alt };
     if (t >= pcCaminho[n - 1].t) return (Vector2){ pcCaminho[n - 1].x * larg, pcCaminho[n - 1].y * alt };
@@ -289,7 +290,7 @@ static void PcDesenharImagem(Texture2D tex, float alfa)
     DrawTexturePro(
         tex,
         (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         Fade(WHITE, alfa)
@@ -299,8 +300,8 @@ static void PcDesenharImagem(Texture2D tex, float alfa)
 // Tres blocos azuis que correm no trilho, como na tela de boot
 static void PcDesenharBarra(float t)
 {
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
     float x0 = PC_TRILHO.x * larg, y0 = PC_TRILHO.y * alt;
     float w = PC_TRILHO.width * larg, h = PC_TRILHO.height * alt;
 
@@ -322,10 +323,10 @@ static void PcDesenharBarra(float t)
 static void PcDesenhar(const Assets *assets)
 {
     float t = pcTempo;
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BLACK);
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, BLACK);
 
     if (t < PC_BOOT_FIM + PC_DESK_FADE)
     {
@@ -377,7 +378,7 @@ static void PcDesenhar(const Assets *assets)
     {
         float a = pcSaida / PC_SAIDA;
         if (a > 1.0f) a = 1.0f;
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, a));
+        DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, a));
     }
     else if (t >= PC_ESPERA)
     {
@@ -434,8 +435,8 @@ static void DesenharAvisoSom(void)
     int larguraTexto = UiMeasureText(texto, 18);
 
     Rectangle caixa = {
-        (float)GetScreenWidth() - larguraTexto - 44.0f,
-        (float)GetScreenHeight() - 40.0f,
+        (float)TELA_LARGURA - larguraTexto - 44.0f,
+        (float)TELA_ALTURA - 40.0f,
         larguraTexto + 28.0f,
         30.0f
     };
@@ -500,7 +501,7 @@ static void DesenharFlash(void)
     float intensidade = flashTimer / FLASH_DURACAO;      // 1 -> 0
 
     DrawRectangle(
-        0, 0, GetScreenWidth(), GetScreenHeight(),
+        0, 0, TELA_LARGURA, TELA_ALTURA,
         Fade((Color){255, 235, 250, 255}, intensidade)
     );
 
@@ -509,13 +510,13 @@ static void DesenharFlash(void)
     {
         for (int i = 0; i < 10; i++)
         {
-            int posY = GetRandomValue(0, GetScreenHeight() - 20);
+            int posY = GetRandomValue(0, TELA_ALTURA - 20);
             int alturaListra = GetRandomValue(4, 18);
             int posX = GetRandomValue(0, 300);
 
             Color corListra = (i % 2 == 0) ? (Color){255, 105, 200, 255} : (Color){80, 200, 255, 255};
 
-            DrawRectangle(posX, posY, GetScreenWidth() - posX, alturaListra, Fade(corListra, 0.5f * intensidade));
+            DrawRectangle(posX, posY, TELA_LARGURA - posX, alturaListra, Fade(corListra, 0.5f * intensidade));
         }
     }
 }
@@ -737,7 +738,7 @@ static void DesenharImagemTela(Texture2D tex)
     DrawTexturePro(
         tex,
         (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
@@ -771,7 +772,7 @@ static void DesenharImagemZoom(Texture2D tex, SceneID cena, float fx, float fy)
     DrawTexturePro(
         tex,
         (Rectangle){ x0, y0, w, h },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
@@ -862,7 +863,7 @@ static void DesenharEscolha(GameState *game)
     const Escolha *e = &ESCOLHAS[game->choice];
 
     // escurece o fundo
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.45f));
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, 0.45f));
 
     if (EscolhaNoMSN(game->choice))
     {
@@ -1364,7 +1365,7 @@ static Rectangle AreaBotaoMenu(GameScreen tela)
     const float margem = 14.0f;
 
     if (tela == SCREEN_ROOM)
-        return (Rectangle){GetScreenWidth() - lado - margem, margem, lado, lado};
+        return (Rectangle){TELA_LARGURA - lado - margem, margem, lado, lado};
 
     // Na senha, o cabecalho ocupa a parte de cima da tela.
     float y = (tela == SCREEN_SENHA) ? 662.0f : margem;
@@ -1992,7 +1993,7 @@ static void DesenharOpcoesDaTelaFinal(int y)
 // Final ruim (roteiro do Ato 3): MSN offline e o cartao
 static void DesenharFinalRuim(const GameState *game)
 {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){10, 10, 18, 255});
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, (Color){10, 10, 18, 255});
 
     // janela do MSN, offline
     Rectangle janela = {340, 70, 600, 180};
@@ -2010,7 +2011,7 @@ static void DesenharFinalRuim(const GameState *game)
 
     int fs = 34;
     int larg = UiMeasureTextEmphasis(cartao, fs);
-    UiDrawTextEmphasis(cartao, (GetScreenWidth() - larg) / 2, 300, fs, WHITE);
+    UiDrawTextEmphasis(cartao, (TELA_LARGURA - larg) / 2, 300, fs, WHITE);
 
     DrawCenteredText("FIM (FINAL RUIM)", 365, 26, (Color){255, 105, 200, 255});
 
@@ -2056,7 +2057,7 @@ void DrawGame(
     {
         DrawRectangle(
             0, 0,
-            GetScreenWidth(), GetScreenHeight(),
+            TELA_LARGURA, TELA_ALTURA,
             (Color){15, 15, 35, 245}
         );
 
