@@ -63,12 +63,20 @@ typedef struct
     Texture2D pcDesktop;        // area de trabalho do Doors XP
     Texture2D pcPerfil;         // pagina da rede social com o recado da Lia
 
-
-    // Ato 3: auditorio do concurso de oratoria
-
-    Texture2D bgAuditorio;      // palco com cortinas e faixa em branco
-    Texture2D monitorCrt;       // monitor antigo do pulpito (tela apagada)
-    Texture2D papelDiscurso;    // folha do discurso (fundo do papel)
+    // Ato 3: texturas proprias (carregadas e liberadas uma vez).
+    Texture2D ato3FinalSemRetorno;
+    Texture2D lia07SemRetorno;
+    Texture2D ato3FinalBastidores;
+    Texture2D lia07Envergonhada;
+    Texture2D ato3Auditorio;
+    Texture2D ato3Pulpito;
+    Texture2D ato3PcDesligado;
+    Texture2D ato3PcLigado;
+    Texture2D ato3Papel;
+    Texture2D ato3PlateiaAtenta;
+    Texture2D ato3PlateiaAplausos;
+    Texture2D lia07NervosaPalco;
+    Texture2D lia07ConfiantePalco;
 
 } Assets;
 
@@ -78,4 +86,4 @@ void LoadAssets(Assets *assets);
 void UnloadAssets(Assets *assets);
 
 
-#endif
+#endif

@@ -13,6 +13,7 @@
  * nessas medidas, e a camera amplia tudo para a janela do jogo (1280x720).
  */
 
+#include "tela.h"
 #include "minigame.h"
 #include "audio_manager.h"
 
@@ -338,8 +339,8 @@ MinigameResult UpdateMinigame(void)
 void DrawMinigame(void)
 {
     // O minigame foi desenhado em 800x450: a camera amplia para a janela.
-    float zoomX = (float)GetScreenWidth() / (float)LARGURA;
-    float zoomY = (float)GetScreenHeight() / (float)ALTURA;
+    float zoomX = (float)TELA_LARGURA / (float)LARGURA;
+    float zoomY = (float)TELA_ALTURA / (float)ALTURA;
 
     Camera2D camera = { 0 };
     camera.zoom = (zoomX < zoomY) ? zoomX : zoomY;

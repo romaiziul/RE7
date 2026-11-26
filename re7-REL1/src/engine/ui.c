@@ -1,3 +1,4 @@
+#include "tela.h"
 #include "ui.h"
 
 #include <math.h>
@@ -115,7 +116,7 @@ void DrawCenteredText(
 
     int x =
         (
-            GetScreenWidth()
+            TELA_LARGURA
             -
             width
         )
@@ -360,7 +361,7 @@ void DrawDebugGrid(void)
 {
     for (
         int x = 0;
-        x < GetScreenWidth();
+        x < TELA_LARGURA;
         x += 100
     )
     {
@@ -368,7 +369,7 @@ void DrawDebugGrid(void)
             x,
             0,
             x,
-            GetScreenHeight(),
+            TELA_ALTURA,
             Fade(WHITE, 0.25f)
         );
     }
@@ -376,14 +377,14 @@ void DrawDebugGrid(void)
 
     for (
         int y = 0;
-        y < GetScreenHeight();
+        y < TELA_ALTURA;
         y += 100
     )
     {
         DrawLine(
             0,
             y,
-            GetScreenWidth(),
+            TELA_LARGURA,
             y,
             Fade(WHITE, 0.25f)
         );

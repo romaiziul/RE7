@@ -1,3 +1,4 @@
+#include "tela.h"
 #include "game.h"
 
 #include "ui.h"
@@ -17,6 +18,8 @@
 #include "ato3.h"
 #include "ato3_logica.h"
 #include "entre_linhas.h"
+#include "final_discurso.h"
+#include "final_tokens.h"
 #include "story_ato3.h"
 
 
@@ -31,8 +34,8 @@ static void BrilhoSuave(float centroX, float centroY, float raio, Color cor, flo
 
 static void DesenharFundo(void)
 {
-    int larguraTela = GetScreenWidth();
-    int alturaTela = GetScreenHeight();
+    int larguraTela = TELA_LARGURA;
+    int alturaTela = TELA_ALTURA;
     float tempo = (float)GetTime();
 
     // base: violeta-noite para azul-marinho
@@ -190,7 +193,7 @@ static void DesenharFade(void)
     if (fadeFase == FADE_ESCURECENDO) alfa = t;
     else if (fadeFase == FADE_CLAREANDO) alfa = 1.0f - t;
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, alfa));
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, alfa));
 
     // o texto entra e sai com o mesmo fade da tela
     const char *texto = TextoDeTransicao(fadeDestino);
@@ -198,7 +201,7 @@ static void DesenharFade(void)
     {
         int tamanho = 44;
         int largura = MeasureText(texto, tamanho);
-        DrawText(texto, (GetScreenWidth() - largura) / 2, GetScreenHeight() / 2 - tamanho / 2,
+        DrawText(texto, (TELA_LARGURA - largura) / 2, TELA_ALTURA / 2 - tamanho / 2,
                  tamanho, Fade(WHITE, alfa));
     }
 }
@@ -245,8 +248,8 @@ static const PcPonto pcCaminho[] =
 static Vector2 PcPosicaoMouse(float t)
 {
     int n = (int)(sizeof(pcCaminho) / sizeof(pcCaminho[0]));
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
 
     if (t <= pcCaminho[0].t) return (Vector2){ pcCaminho[0].x * larg, pcCaminho[0].y * alt };
     if (t >= pcCaminho[n - 1].t) return (Vector2){ pcCaminho[n - 1].x * larg, pcCaminho[n - 1].y * alt };
@@ -289,7 +292,7 @@ static void PcDesenharImagem(Texture2D tex, float alfa)
     DrawTexturePro(
         tex,
         (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         Fade(WHITE, alfa)
@@ -299,8 +302,8 @@ static void PcDesenharImagem(Texture2D tex, float alfa)
 // Tres blocos azuis que correm no trilho, como na tela de boot
 static void PcDesenharBarra(float t)
 {
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
     float x0 = PC_TRILHO.x * larg, y0 = PC_TRILHO.y * alt;
     float w = PC_TRILHO.width * larg, h = PC_TRILHO.height * alt;
 
@@ -322,10 +325,10 @@ static void PcDesenharBarra(float t)
 static void PcDesenhar(const Assets *assets)
 {
     float t = pcTempo;
-    float larg = (float)GetScreenWidth();
-    float alt = (float)GetScreenHeight();
+    float larg = (float)TELA_LARGURA;
+    float alt = (float)TELA_ALTURA;
 
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), BLACK);
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, BLACK);
 
     if (t < PC_BOOT_FIM + PC_DESK_FADE)
     {
@@ -377,7 +380,7 @@ static void PcDesenhar(const Assets *assets)
     {
         float a = pcSaida / PC_SAIDA;
         if (a > 1.0f) a = 1.0f;
-        DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, a));
+        DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, a));
     }
     else if (t >= PC_ESPERA)
     {
@@ -434,8 +437,8 @@ static void DesenharAvisoSom(void)
     int larguraTexto = UiMeasureText(texto, 18);
 
     Rectangle caixa = {
-        (float)GetScreenWidth() - larguraTexto - 44.0f,
-        (float)GetScreenHeight() - 40.0f,
+        (float)TELA_LARGURA - larguraTexto - 44.0f,
+        (float)TELA_ALTURA - 40.0f,
         larguraTexto + 28.0f,
         30.0f
     };
@@ -500,7 +503,7 @@ static void DesenharFlash(void)
     float intensidade = flashTimer / FLASH_DURACAO;      // 1 -> 0
 
     DrawRectangle(
-        0, 0, GetScreenWidth(), GetScreenHeight(),
+        0, 0, TELA_LARGURA, TELA_ALTURA,
         Fade((Color){255, 235, 250, 255}, intensidade)
     );
 
@@ -509,13 +512,13 @@ static void DesenharFlash(void)
     {
         for (int i = 0; i < 10; i++)
         {
-            int posY = GetRandomValue(0, GetScreenHeight() - 20);
+            int posY = GetRandomValue(0, TELA_ALTURA - 20);
             int alturaListra = GetRandomValue(4, 18);
             int posX = GetRandomValue(0, 300);
 
             Color corListra = (i % 2 == 0) ? (Color){255, 105, 200, 255} : (Color){80, 200, 255, 255};
 
-            DrawRectangle(posX, posY, GetScreenWidth() - posX, alturaListra, Fade(corListra, 0.5f * intensidade));
+            DrawRectangle(posX, posY, TELA_LARGURA - posX, alturaListra, Fade(corListra, 0.5f * intensidade));
         }
     }
 }
@@ -737,7 +740,7 @@ static void DesenharImagemTela(Texture2D tex)
     DrawTexturePro(
         tex,
         (Rectangle){ 0, 0, (float)tex.width, (float)tex.height },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
@@ -771,7 +774,7 @@ static void DesenharImagemZoom(Texture2D tex, SceneID cena, float fx, float fy)
     DrawTexturePro(
         tex,
         (Rectangle){ x0, y0, w, h },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
@@ -862,7 +865,7 @@ static void DesenharEscolha(GameState *game)
     const Escolha *e = &ESCOLHAS[game->choice];
 
     // escurece o fundo
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), Fade(BLACK, 0.45f));
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, Fade(BLACK, 0.45f));
 
     if (EscolhaNoMSN(game->choice))
     {
@@ -997,6 +1000,10 @@ static void EncerrarCampanha(GameState *game, EstadoCampanha final, MotivoFinalR
 {
     game->campanha = final;
     game->motivoFinalRuim = motivo;
+    if (final == CAMPANHA_FINAL_RUIM && motivo == FINAL_RUIM_DISCURSO)
+        FinalDiscurso_Iniciar();
+    if (final == CAMPANHA_FINAL_RUIM && motivo == FINAL_RUIM_SEM_TOKENS)
+        FinalTokens_Iniciar();
     game->choice = ESCOLHA_NENHUMA;
 
     fadeFase = FADE_NENHUM;
@@ -1299,6 +1306,11 @@ static void ConcluirEntreLinhas(GameState *game)
 {
     // as tres palavras recuperadas: a plateia aplaude e a Lia fala
     game->currentScreen = SCREEN_GAME;
+    if (Ato3EntreLinhas_FinalRuim())
+    {
+        EncerrarCampanha(game, CAMPANHA_FINAL_RUIM, FINAL_RUIM_DISCURSO);
+        return;
+    }
     ChangeScene(game, Ato3_CenaDeConclusao(game->iaEscreveuDiscurso));
     SaveGame(game);
 }
@@ -1364,7 +1376,7 @@ static Rectangle AreaBotaoMenu(GameScreen tela)
     const float margem = 14.0f;
 
     if (tela == SCREEN_ROOM)
-        return (Rectangle){GetScreenWidth() - lado - margem, margem, lado, lado};
+        return (Rectangle){TELA_LARGURA - lado - margem, margem, lado, lado};
 
     // Na senha, o cabecalho ocupa a parte de cima da tela.
     float y = (tela == SCREEN_SENHA) ? 662.0f : margem;
@@ -1593,6 +1605,26 @@ void UpdateGame(GameState *game)
 
     if (game->currentScreen == SCREEN_ENDING)
     {
+        if (game->campanha == CAMPANHA_FINAL_RUIM && game->motivoFinalRuim == FINAL_RUIM_DISCURSO)
+        {
+            switch (FinalDiscurso_Atualizar()) {
+                case FINAL_DISCURSO_REJOGAR: ComecarNovoJogo(game); break;
+                case FINAL_DISCURSO_MENU: game->currentScreen = SCREEN_MENU; break;
+                case FINAL_DISCURSO_SAIR: game->shouldExit = true; break;
+                default: break;
+            }
+            return;
+        }
+        if (game->campanha == CAMPANHA_FINAL_RUIM && game->motivoFinalRuim == FINAL_RUIM_SEM_TOKENS)
+        {
+            switch (FinalTokens_Atualizar()) {
+                case FINAL_TOKENS_REJOGAR: ComecarNovoJogo(game); break;
+                case FINAL_TOKENS_MENU: game->currentScreen = SCREEN_MENU; break;
+                case FINAL_TOKENS_SAIR: game->shouldExit = true; break;
+                default: break;
+            }
+            return;
+        }
         if (avisoInvalido > 0.0f) avisoInvalido -= GetFrameTime();
 
         int tecla;                  // tecla apertada neste quadro
@@ -1894,7 +1926,7 @@ static bool CenaDoAto3(SceneID cena)
     return cena >= SCENE_ATO3_ABERTURA && cena < SCENE_COUNT;
 }
 
-static void DesenharCenaAto3(GameState *game, Assets *assets, const Scene *scene, Dialogue dialogue)
+static void DesenharCenaAto3(GameState *game, const Scene *scene, Dialogue dialogue, const Assets *assets)
 {
     // tempo desde que a cena comecou (o PC pisca no comeco da reserva,
     // a camera se aproxima da Lia na conclusao)
@@ -1918,21 +1950,14 @@ static void DesenharCenaAto3(GameState *game, Assets *assets, const Scene *scene
     float foco = tempoNaCena / 1.2f;
     if (foco > 1.0f) foco = 1.0f;
 
-    // Expressao da Lia no pulpito: a da ultima fala dela. Sem expressao
-    // marcada (ou "preocupada", que so existe na Lia de 2026), ela fica
-    // pensativa enquanto esta nervosa.
-    Pose poseLia = PoseDe(scene, game->dialogueIndex, "Lia");
-    if (poseLia == POSE_PREOCUPADA || (poseLia == POSE_PADRAO && antesDaEscolha))
-        poseLia = POSE_PENSATIVA;
-
     Ato3Cena cena = {
         .pcOnline = !Tokens_IAOffline(),
         .pcPiscando = (c == SCENE_ATO3_RESERVA && tempoNaCena < 1.2f),
         // cenario 1: a plateia aplaude no fim, mas a Lia nao sorri
         .aplausos = conclusao || (iaLeu && game->dialogueIndex >= scene->dialogueCount - 1),
+        .professoraSorri = conclusao,
         .foco = conclusao ? foco * (2.0f - foco) : 0.0f,
-        .nervosismo = antesDaEscolha ? 1.0f : ((c == SCENE_ATO3_AJUDA || c == SCENE_ATO3_SOZINHA) ? 0.6f : 0.0f),
-        .lia = TexturaLia(assets, 2007, poseLia)
+        .nervosismo = antesDaEscolha ? 1.0f : ((c == SCENE_ATO3_AJUDA || c == SCENE_ATO3_SOZINHA) ? 0.6f : 0.0f)
     };
 
     Ato3_DesenharCenario(&cena, assets);
@@ -1947,8 +1972,8 @@ static void DesenharCenaAto3(GameState *game, Assets *assets, const Scene *scene
         float nitidez[3] = { n, n, n };
 
         // a esquerda do palco: a Lia e o PC do pulpito continuam visiveis
-        Rectangle papel = {70, 175, 400, 232};
-        Ato3_DesenharPapel(papel, 19, nitidez, -1, (Vector2){0, 0}, assets->papelDiscurso);
+        Rectangle papel = {190, 165, 400, 232};
+        Ato3_DesenharPapel(assets, papel, 19, nitidez, -1, (Vector2){0, 0});
 
         if (n < 1.0f)
             UiDrawText("As palavras parecem embaralhadas...", (int)papel.x + 27,
@@ -1990,9 +2015,19 @@ static void DesenharOpcoesDaTelaFinal(int y)
 }
 
 // Final ruim (roteiro do Ato 3): MSN offline e o cartao
-static void DesenharFinalRuim(const GameState *game)
+static void DesenharFinalRuim(const GameState *game, const Assets *assets)
 {
-    DrawRectangle(0, 0, GetScreenWidth(), GetScreenHeight(), (Color){10, 10, 18, 255});
+    if (game->motivoFinalRuim == FINAL_RUIM_SEM_TOKENS)
+    {
+        FinalTokens_Desenhar(assets);
+        return;
+    }
+    if (game->motivoFinalRuim == FINAL_RUIM_DISCURSO)
+    {
+        FinalDiscurso_Desenhar(assets);
+        return;
+    }
+    DrawRectangle(0, 0, TELA_LARGURA, TELA_ALTURA, (Color){10, 10, 18, 255});
 
     // janela do MSN, offline
     Rectangle janela = {340, 70, 600, 180};
@@ -2010,7 +2045,7 @@ static void DesenharFinalRuim(const GameState *game)
 
     int fs = 34;
     int larg = UiMeasureTextEmphasis(cartao, fs);
-    UiDrawTextEmphasis(cartao, (GetScreenWidth() - larg) / 2, 300, fs, WHITE);
+    UiDrawTextEmphasis(cartao, (TELA_LARGURA - larg) / 2, 300, fs, WHITE);
 
     DrawCenteredText("FIM (FINAL RUIM)", 365, 26, (Color){255, 105, 200, 255});
 
@@ -2056,7 +2091,7 @@ void DrawGame(
     {
         DrawRectangle(
             0, 0,
-            GetScreenWidth(), GetScreenHeight(),
+            TELA_LARGURA, TELA_ALTURA,
             (Color){15, 15, 35, 245}
         );
 
@@ -2177,7 +2212,7 @@ void DrawGame(
     if (game->currentScreen == SCREEN_ENDING)
     {
         if (game->campanha == CAMPANHA_FINAL_RUIM)
-            DesenharFinalRuim(game);
+            DesenharFinalRuim(game, assets);
         else
             DesenharFinalBom();
 
@@ -2247,7 +2282,7 @@ void DrawGame(
 
         if (CenaDoAto3(game->currentScene))
         {
-            DesenharCenaAto3(game, assets, &scene, dialogue);
+            DesenharCenaAto3(game, &scene, dialogue, assets);
             return;
         }
 
@@ -2578,6 +2613,13 @@ bool Game_AvancarEtapa(GameState *game)
         default:
             return false;
     }
+}
+
+void Game_ForcarFinalRuim(GameState *game, MotivoFinalRuim motivo)
+{
+    DevLimparTransicoes(game);
+    if (motivo == FINAL_RUIM_SEM_TOKENS) Tokens_Zerar();
+    EncerrarCampanha(game, CAMPANHA_FINAL_RUIM, motivo);
 }
 
 void Game_ForcarFinal(GameState *game, EstadoCampanha final)

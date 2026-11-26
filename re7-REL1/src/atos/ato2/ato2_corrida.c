@@ -17,6 +17,7 @@
  * igual ao minigame.c antigo.
  */
 
+#include "tela.h"
 #include "ato2_corrida.h"
 #include "audio_manager.h"
 
@@ -434,8 +435,8 @@ static void DesenharBarra(void)
 
 void DrawAto2Corrida(void)
 {
-    float zoomX = (float)GetScreenWidth() / (float)LARGURA;
-    float zoomY = (float)GetScreenHeight() / (float)ALTURA;
+    float zoomX = (float)TELA_LARGURA / (float)LARGURA;
+    float zoomY = (float)TELA_ALTURA / (float)ALTURA;
 
     Camera2D camera = { 0 };
     camera.zoom = (zoomX < zoomY) ? zoomX : zoomY;
