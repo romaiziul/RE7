@@ -40,7 +40,8 @@ typedef enum
 typedef enum
 {
     FINAL_RUIM_IA_LEU,          // a IA leu o papel no Ato 3
-    FINAL_RUIM_SEM_TOKENS       // pediu ajuda e a barra chegou a 0
+    FINAL_RUIM_SEM_TOKENS,      // pediu ajuda e a barra chegou a 0
+    FINAL_RUIM_DISCURSO
 } MotivoFinalRuim;
 
 
@@ -125,6 +126,7 @@ bool Game_AvancarEtapa(GameState *game);
 
 // Vai direto para a tela final (bom ou ruim).
 void Game_ForcarFinal(GameState *game, EstadoCampanha final);
+void Game_ForcarFinalRuim(GameState *game, MotivoFinalRuim motivo);
 
 const char *Game_NomeDaCena(SceneID cena);
 const char *Game_NomeDaTela(GameScreen tela);

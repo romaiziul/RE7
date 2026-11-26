@@ -1,6 +1,17 @@
 #include "assets.h"
 
 
+// Mipmaps mantem os recortes suaves quando reduzidos para o palco.
+static Texture2D CarregarArteAto3(const char *path)
+{
+    Texture2D t = LoadTexture(path);
+    if (t.id) {
+        GenTextureMipmaps(&t);
+        SetTextureFilter(t, TEXTURE_FILTER_TRILINEAR);
+    }
+    return t;
+}
+
 void LoadAssets(Assets *assets)
 {
 
@@ -90,21 +101,33 @@ void LoadAssets(Assets *assets)
     assets->pcDesktop = LoadTexture("assets/ato2/ato2_doors_xp.png");
     assets->pcPerfil = LoadTexture("assets/ato2/ato2_cg_perfil.png");
 
-
     // ATO 3
-
-    assets->bgAuditorio = LoadTexture("assets/ato3/ato3_auditorio.png");
-    assets->monitorCrt = LoadTexture("assets/ato3/ato3_monitor_crt.png");
-    assets->papelDiscurso = LoadTexture("assets/ato3/ato3_papel_discurso.png");
-
-    SetTextureFilter(assets->bgAuditorio, TEXTURE_FILTER_BILINEAR);
-    SetTextureFilter(assets->monitorCrt, TEXTURE_FILTER_BILINEAR);
-    SetTextureFilter(assets->papelDiscurso, TEXTURE_FILTER_BILINEAR);
+    assets->ato3FinalSemRetorno = CarregarArteAto3("assets/ato3/ato3_final_sem_retorno.png");
+    assets->lia07SemRetorno = CarregarArteAto3("assets/comum/lia07_sem_retorno.png");
+    assets->ato3FinalBastidores = CarregarArteAto3("assets/ato3/ato3_final_bastidores.png");
+    assets->lia07Envergonhada = CarregarArteAto3("assets/comum/lia07_envergonhada.png");
+    assets->ato3Auditorio = CarregarArteAto3("assets/ato3/ato3_auditorio.png");
+    assets->ato3Pulpito = CarregarArteAto3("assets/ato3/ato3_pulpito.png");
+    assets->ato3PcDesligado = CarregarArteAto3("assets/ato3/ato3_pc_desligado.png");
+    assets->ato3PcLigado = CarregarArteAto3("assets/ato3/ato3_pc_ligado.png");
+    assets->ato3Papel = CarregarArteAto3("assets/ato3/ato3_papel_discurso.png");
+    assets->ato3PlateiaAtenta = CarregarArteAto3("assets/ato3/ato3_plateia_atenta.png");
+    assets->ato3PlateiaAplausos = CarregarArteAto3("assets/ato3/ato3_plateia_aplausos.png");
+    assets->lia07NervosaPalco = CarregarArteAto3("assets/comum/lia07_nervosa_palco.png");
+    assets->lia07ConfiantePalco = CarregarArteAto3("assets/comum/lia07_confiante_palco.png");
 }
 
 
 void UnloadAssets(Assets *assets)
 {
+    if (assets->ato3FinalSemRetorno.id) UnloadTexture(assets->ato3FinalSemRetorno);
+    assets->ato3FinalSemRetorno = (Texture2D){0};
+    if (assets->lia07SemRetorno.id) UnloadTexture(assets->lia07SemRetorno);
+    assets->lia07SemRetorno = (Texture2D){0};
+    if (assets->ato3FinalBastidores.id) UnloadTexture(assets->ato3FinalBastidores);
+    assets->ato3FinalBastidores = (Texture2D){0};
+    if (assets->lia07Envergonhada.id) UnloadTexture(assets->lia07Envergonhada);
+    assets->lia07Envergonhada = (Texture2D){0};
     UnloadTexture(assets->bgPresent);
     UnloadTexture(assets->bg2007);
     UnloadTexture(assets->bgRua);
@@ -130,9 +153,24 @@ void UnloadAssets(Assets *assets)
     UnloadTexture(assets->pcBoot);
     UnloadTexture(assets->pcDesktop);
     UnloadTexture(assets->pcPerfil);
-    UnloadTexture(assets->bgAuditorio);
-    UnloadTexture(assets->monitorCrt);
-    UnloadTexture(assets->papelDiscurso);
     UnloadTexture(assets->logo);
     UnloadTexture(assets->iaStar);
-}
+    if (assets->ato3Auditorio.id) UnloadTexture(assets->ato3Auditorio);
+    assets->ato3Auditorio = (Texture2D){0};
+    if (assets->ato3Pulpito.id) UnloadTexture(assets->ato3Pulpito);
+    assets->ato3Pulpito = (Texture2D){0};
+    if (assets->ato3PcDesligado.id) UnloadTexture(assets->ato3PcDesligado);
+    assets->ato3PcDesligado = (Texture2D){0};
+    if (assets->ato3PcLigado.id) UnloadTexture(assets->ato3PcLigado);
+    assets->ato3PcLigado = (Texture2D){0};
+    if (assets->ato3Papel.id) UnloadTexture(assets->ato3Papel);
+    assets->ato3Papel = (Texture2D){0};
+    if (assets->ato3PlateiaAtenta.id) UnloadTexture(assets->ato3PlateiaAtenta);
+    assets->ato3PlateiaAtenta = (Texture2D){0};
+    if (assets->ato3PlateiaAplausos.id) UnloadTexture(assets->ato3PlateiaAplausos);
+    assets->ato3PlateiaAplausos = (Texture2D){0};
+    if (assets->lia07NervosaPalco.id) UnloadTexture(assets->lia07NervosaPalco);
+    assets->lia07NervosaPalco = (Texture2D){0};
+    if (assets->lia07ConfiantePalco.id) UnloadTexture(assets->lia07ConfiantePalco);
+    assets->lia07ConfiantePalco = (Texture2D){0};
+}

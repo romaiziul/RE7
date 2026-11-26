@@ -229,6 +229,8 @@ typedef enum
     TESTE_REINICIAR_CAMPANHA,
     TESTE_FINAL_BOM,
     TESTE_FINAL_RUIM,
+    TESTE_FINAL_TOKENS,
+    TESTE_FINAL_DISCURSO,
     TESTE_TOTAL
 } Teste;
 
@@ -262,6 +264,16 @@ static void ExecutarTeste(GameState *game, Teste teste)
             Avisar("Final bom.");
             break;
 
+        case TESTE_FINAL_TOKENS:
+            Game_ForcarFinalRuim(game, FINAL_RUIM_SEM_TOKENS);
+            Avisar("Final sem cargas.");
+            break;
+
+        case TESTE_FINAL_DISCURSO:
+            Game_ForcarFinalRuim(game, FINAL_RUIM_DISCURSO);
+            Avisar("Final do discurso.");
+            break;
+
         case TESTE_FINAL_RUIM:
             Game_ForcarFinal(game, CAMPANHA_FINAL_RUIM);
             Avisar("Final ruim.");
@@ -278,7 +290,8 @@ static void AbaTestes(GameState *game, bool desenhar)
     {
         "Pular diálogo (F6)", "Próxima etapa (F7)",
         "Reiniciar ato (F8)", "Reiniciar campanha",
-        "Forçar final bom",   "Forçar final ruim"
+        "Forçar final bom",   "Forçar final ruim",
+        "Final sem cargas",  "Final do discurso"
     };
 
     for (int i = 0; i < TESTE_TOTAL; i++)
@@ -288,7 +301,7 @@ static void AbaTestes(GameState *game, bool desenhar)
     }
 
     if (desenhar)
-        UiDrawText("Próxima etapa: fim da cena ou do minijogo.", (int)PAINEL.x + 12, (int)(PAINEL.y + TOPO_CONTEUDO + 148), 15, DEV_DISCRETO);
+        UiDrawText("Próxima etapa: fim da cena ou do minijogo.", (int)PAINEL.x + 12, (int)(PAINEL.y + TOPO_CONTEUDO + 196), 15, DEV_DISCRETO);
 }
 
 static void ConteudoDaAba(GameState *game, bool desenhar)
