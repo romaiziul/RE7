@@ -23,5 +23,6 @@ void DrawAto3EntreLinhas(Assets *assets);
 // na tela) e resolve a etapa atual com a palavra certa.
 bool Ato3EntreLinhas_DevPular(void);
 void Ato3EntreLinhas_DevResolverEtapa(void);
+bool Ato3EntreLinhas_FinalRuim(void);
 
 #endif

@@ -1,3 +1,4 @@
+#include "tela.h"
 #include "room.h"
 
 #include "ui.h"
@@ -110,8 +111,8 @@ static bool mostrarAjuda = false;
 static Vector2 CentroDoPonto(int indice)
 {
     return (Vector2){
-        pontosDoQuarto[indice].posicaoX * (float)GetScreenWidth(),
-        pontosDoQuarto[indice].posicaoY * (float)GetScreenHeight()
+        pontosDoQuarto[indice].posicaoX * (float)TELA_LARGURA,
+        pontosDoQuarto[indice].posicaoY * (float)TELA_ALTURA
     };
 }
 
@@ -122,8 +123,8 @@ static Rectangle AreaBotaoContinuar(void)
     float altura = 60.0f;
 
     return (Rectangle){
-        ((float)GetScreenWidth() - largura) / 2.0f,
-        (float)GetScreenHeight() - altura - 36.0f,
+        ((float)TELA_LARGURA - largura) / 2.0f,
+        (float)TELA_ALTURA - altura - 36.0f,
         largura,
         altura
     };
@@ -276,7 +277,7 @@ void DrawRoom(Assets *assets)
     DrawTexturePro(
         assets->bg2007,
         (Rectangle){ 0, 0, (float)assets->bg2007.width, (float)assets->bg2007.height },
-        (Rectangle){ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() },
+        (Rectangle){ 0, 0, (float)TELA_LARGURA, (float)TELA_ALTURA },
         (Vector2){ 0, 0 },
         0.0f,
         WHITE
@@ -308,7 +309,7 @@ void DrawRoom(Assets *assets)
     }
 
     // faixa de cima: instrucao
-    DrawRectangle(0, 0, GetScreenWidth(), 64, Fade(BLACK, 0.6f));
+    DrawRectangle(0, 0, TELA_LARGURA, 64, Fade(BLACK, 0.6f));
 
     UiDrawText("Explore o quarto (opcional)", 70, 12, 26, WHITE);
 
@@ -343,7 +344,7 @@ void DrawRoom(Assets *assets)
         Vector2 mouse = GetMousePosition();
 
         UiDrawText(
-            TextFormat("F1 ajuda | mouse: x=%.3f  y=%.3f", mouse.x / (float)GetScreenWidth(), mouse.y / (float)GetScreenHeight()),
+            TextFormat("F1 ajuda | mouse: x=%.3f  y=%.3f", mouse.x / (float)TELA_LARGURA, mouse.y / (float)TELA_ALTURA),
             24, 76, 20, YELLOW
         );
     }
